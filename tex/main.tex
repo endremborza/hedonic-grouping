@@ -1,0 +1,527 @@
+%\documentclass[12pt,a4paper]{article}				%! Document class
+\documentclass{elsarticle}
+
+\makeatletter
+\def\ps@pprintTitle{%
+ \let\@oddhead\@empty
+ \let\@evenhead\@empty
+ \def\@oddfoot{}%
+ \let\@evenfoot\@oddfoot}
+\makeatother
+
+% Mandatory packages
+\usepackage[utf8]{inputenc}							%! Character encoding
+\usepackage[T1]{fontenc}							%! Font encoding
+\usepackage[english]{babel}							%! Language setting
+
+%\renewcommand*{\rmdefault}{bookman}
+
+% Text packages
+%\usepackage[margin=2.5cm,lmargin=3.5cm,bmargin=4cm]{geometry}	% Margin size
+\usepackage{enumerate}								% Custom enumeration lists
+\usepackage[hang,flushmargin]{footmisc}				% Stable footnotes in headings
+\usepackage{natbib}									% Bibliography
+\usepackage{multicol}								% Multiple columns in text
+\usepackage{setspace}								% Line spacing
+\usepackage{lmodern}								% LModern font; enhanced Computer Modern
+\usepackage{anyfontsize}							% Custom font size definitions
+
+\usepackage{fancyhdr}								% Fancy headers
+%\setlength{\headheight}{15.2pt}						% Header default length
+\lhead{\fancyplain{}%								% Left header italic, no uppercase letters
+	{\itshape{\nouppercase{\leftmark}}}}
+\rhead{\fancyplain{}%								% Right header italic, no uppercase letters
+	{\itshape{\nouppercase{\rightmark}}}}
+
+\usepackage[bookmarks=true]{hyperref}				% Hyperreferences
+
+\hypersetup{										% Setup of hyperref
+	colorlinks=false,
+	citecolor=black,
+	filecolor=black,
+	linkcolor=black,
+	urlcolor=black
+}
+
+% Figure/table packages
+\usepackage{float}									% Figure floats
+\usepackage{subfig}									% Subfigures
+\usepackage{multirow}								% Merged rows in tables
+\usepackage{dcolumn}								% Custom table delimiters
+\usepackage{makecell}								% Custom line width
+\usepackage[labelfont=bf, font=normalsize]{caption} % Bold captions
+\captionsetup{format=hang}
+
+% Math packages
+\usepackage{amsmath}								% AMS math package
+\usepackage{amssymb}								% Math symbols
+\usepackage{amsthm}									% Custom theorem environments
+\usepackage{units}									% Numerical fractions
+
+\newtheorem{mydef}{Definition}
+\newtheorem{myex}{Example}
+\newtheorem{myalg}{Algorithm}
+\newtheorem{mysta}{Corollary}
+\usepackage[ruled,vlined]{algorithm2e}
+
+%STRIKETHROUGH
+\usepackage[normalem]{ulem}
+
+\begin{document}
+%\lfoot{ \fancyplain{}{\thepage}}
+
+\begin{frontmatter}
+
+\title{Generalized Stable Matching}
+
+
+%% Group authors per affiliation:
+\author{Endre Márk Borza}%\fnref{aff1}}
+
+%\fntext[aff1]{Rajk László College for Advanced Studies, Central European University}
+%\address{Psychology of Sexuality course}
+
+%% or include affiliations in footnotes:
+
+
+\begin{abstract}
+In this paper I outline and solve a strongly generalized stable matching problem called a \emph{grouping problem}. I refine the stability condition to fit the grouping problem, so that an algorithm can be built to find a solution that satisfies this criterion. I produce my own algorithm, that either returns with a stable grouping, or shows that one does not exist.
+\end{abstract}
+
+%\begin{keyword}
+%sex, data, social-media, natural language processing
+%\end{keyword}
+
+\end{frontmatter}
+
+
+%\tableofcontents
+
+
+%\pagestyle{fancyplain}
+%\fancyhf{}
+%\lhead{\fancyplain{}{Endre Mark Borza\\ \today}}
+%\rhead{ \fancyplain{}{Disjoint Sets Problem\\ELTE}}
+
+%\onehalfspace
+
+%\headheight = 40pt
+
+\section{Introduction}
+
+%\subsection{Motivation}
+
+Simple algorithms matching two agents pairwise together have had a wide range of applications in the last few decades. Residents are assigned to hospitals \citep{roth84}, kidneys are transferred from donors to recipients \citep{roth05kid}, students are assigned to schools in a number of great american cities \citep{roth05new,roth05bos} and even people are assigned to people \citep{hitsch10} using such simple mechanisms. Most of the success of these methods comes from understanding and pursuing stability. Stability in essence means, that there are no two agents motivated to mess up the matching.
+
+Stability is surprisingly easy to achieve in some cases, and so beneficial, that it is worth looking for ways to find it in more difficult circumstances. One of these difficult cases is grouping. In a simple matching problem only one match per agent needs to be considered. A grouping problem can be much more complicated. A group of $n$ agents consists of $\frac{n(n-1)}{2}$ matches and in a population of $p$ number of agents they have the chance to leave the current allocation and reconnect $2^p-1$ kind of ways. This means that if 5 agents are grouped together, from a population of twenty, each of the 5 has over 1 million other possible groups to be in. If we aspire stability, all those other million possible matchings should seem either impossible or undesirable.
+
+It's not just that a stable grouping seems much harder to create, even the concept of stability is harder to grasp in a grouping sense. Take a simple example. You need to take a kindergarten class, to a field trip, in two of the parent's cars. You need to divide 8 kindergartners to 2 groups of four, in a way that when you leave the cars outside at the gas station, you know that by the time you get back from the register they won't have messed up the grouping. Now, all the possible ways you can imagine 8 kindergartners trying to get their way in two cars are possible different definitions of stability in a grouping. Can they all decide to kick someone out of a car because they don't like him? Can two of them switch if they both want to? If two of them want to be together can they kick someone out of one of the groups, or only if the rest of the group agrees? These are all different actions with more than one willing participant.
+
+Finding a solution to a grouping problem naturally might have little more significant consequences than getting a few infants to a field trip safely. In many cases, if the preferences of the agents can be set in the right way, a grouping problem can represent a number of  interesting and useful issues. The most obvious is probably people living, working or studying together. In these instances, people might have much more complex preferences than just a total order of individuals who they'd prefer to be grouped with. People might look for portfolios, might like two people very much who hate each other and would rather avoid the conflict, and so on. Well organized cooperation can be key in both a working and studying environment. Being able to solve grouping problems in an efficient and stable way can be an important factor in it. Institutions, branches of government and companies also benefit greatly from better organized and stable cooperation. Properly grouping firms together is also an important problem of portfolio and risk management, while in a within firm sense stable grouping can help efficiency and HR issues.
+
+Grouping might not only be useful in the case of people or institutions. Connections between computers are an indispensable part of our lives. Treating computers as agents who act according to their self interest, and applying mechanisms to them similarly to humans is not a new concept. \citep{nisan99}
+
+\section{Framework}
+
+\subsection{Denotation}
+
+In a grouping problem, an $A$ set of agents needs to be organized into groups, with a set of preference profiles $\mathbf{\Omega}$. For each $\alpha_i \in A$ agent, there exists a corresponding $\Omega_i \in \mathbf{\Omega}$ preference profile. Since each $\Omega_i$ needs to rank the possible other members of a group for agent $\alpha_i$, it is a total order on the powerset of $A$ without $\alpha_i$, so $\Omega_i \subset \mathcal{P}(A\setminus \alpha_i) \times \mathcal{P}(A\setminus \alpha_i)$.
+
+In order to solve the problem, a $\mu \subseteq A \times A$ matching needs to be created, a symmetric transitive binary relation on set $A$. Also characterizing the problem is $M \subseteq \mathcal{P}(A \times A)$ which is a set of all possible matchings. So essentially, the problem is $\langle A, \mathbf{\Omega}, M \rangle$ with a possible solution $\mu$.
+
+In a number of stable matching problems, some restrictions apply to $M$. Agents are not necessarily homogeneous, so restrictions can either concern the cardinality or composition of sets created by a matching $\mu$. Denote the set of pairs of agent $\alpha_i \in A$ in matching $\mu$ as $\mu(\alpha_i)$ and all possible sets of pairs as $M(\alpha_i)$. So $\Omega_i$ is a total order on the set $M(\alpha_i)$.
+
+In order to evaluate any $\mu$ solution, following the logic of \cite{budish12}, primarily the \textit{good} attribute of stability is reapplied from stable matching.
+
+\subsection{Stable Matching}
+
+In the \textbf{marriage problem}, an $A$ set of $n$ number of participants can be equally divided into categories of men $A_M$ and $A_W$ with $\frac{n}{2}$ elements each. Each participant, has a preference profile, ranking members of the other sex in order of marital preference.\footnote{ \cite{galeshapley62} show a case of the marriage problem, where preference rankings are never weak, I will keep this assumption} With this setup, a matching needs to be created where every man has exactly one partner, a woman, and every woman has one partner, a man.
+
+With the algorithm of \cite{galeshapley62}, a matching can be created that satisfies the following two criteria \footnote{Paraphrased from \cite[p. 10]{galeshapley62} since they derive the marriage problem from the college admission problem and use different phrasing}
+
+\begin{quotation} 
+\textit{An assignment of men to women will be called \textbf{unstable} if there are two men or women $\alpha$ and $\beta$ who are assigned to $\gamma$ and $\delta$, respectively, although $\alpha$ prefers $\delta$ to $\gamma$ and $\delta$ prefers $\alpha$ to $\beta$} 
+\end{quotation}
+
+The stable marriage problem has a very strict restriction on both the cardinality and composition of possible sets created by the matching. Each created set needs to have a cardinality of two, with these two coming from two different pre-defined selections of participants. To reach the grouping problem, these restrictions need to be eliminated, and therefore each preference profile expanded to possible sets, not only other participants.
+
+An example of relaxing relevant restrictions is the \textbf{college admission problem} (also known as the hospitals/residents problem). The $A$ set of participants is still divided into categories of colleges $A_C$ and students $A_S$, however this time they need not have the same cardinality. Which of course means that colleges can admit more than one student, and it is also possible for a student not to get into any of the colleges. Therefore the structural restrictions concerning the cardinality of the formed sets are determined by the possible acceptance numbers of colleges, and the ones concerning composition require that each formed set must contain no more than one college.
+
+In this setting, a preferential constraint is introduced. Namely students are not allowed to differentiate between results based on what group of fellow students they end up with, only the college they get admitted to. If possible preference profiles get a little more complicated, it becomes possible that no stable solution exists. Previous literature mostly discusses the case where students are allowed to form bonds, and have a joint preference order, meaning that it is important for one of the students where the other ends up, even if they don't end up together. \cite{roth84} shows that with the stability definition described below there are examples where no stable matching can be found, while \cite{ronn90} shows that a mechanism that solves the college problem with bonds is NP-complete.
+
+\begin{quotation}
+
+''An assignment is unstable if one of the following holds:
+\begin{itemize}
+\item[1] There exists a destabilizing pair in the ordinary sense; that is, there exists a single student (a student that is not a member of a couple) and a college that are not assigned to each other but prefer each other over their current assignment; or if 
+
+\item[2] There exist a couple of students that can improve their joint assignment with a corresponding improvement for the relevant colleges. Suppose couple ($\alpha$, $\beta$) were assigned to colleges $\gamma$ and $\delta$, respectively. There are two cases of improvement possible: 
+
+
+\begin{itemize}
+\item[(a)] There exists a college $\theta$ such that $\theta$ prefers one of the two students, say $\alpha$, over the current assignment for one of its students, and the joint assignment ($\theta$, $\delta$) is preferred by the couple over the joint assignment ($\gamma$, $\delta$). So the assignment of one of the two students does not change, and for the student whose assignment does change, the change constitutes an improvement for both the students and the new college.
+\item[(b)] There exist two colleges, $\theta$ and $\eta$, such that couple ($\alpha$, $\beta$) prefers the assignment ($\theta$, $\eta$) over ($\gamma$, $\delta$), and both colleges $\theta$ and $\eta$ prefer $\alpha$ and $\beta$, respectively, over their current assignments. In this case the assignments of both students change, and their assignment to the new colleges is an improvement for them and for both colleges.''\citep[pp. 288-289]{ronn90}\footnote{The phrasing is slightly changed from hospital interns to college students}
+
+\end{itemize}
+
+\end{itemize}
+\end{quotation}
+
+
+Note that the introduction of such bonds is generally beyond the outlined grouping problem. In a grouping problem agents only rank other agents they might end up with, not the matchings of others. The real world relevance of Roth's example is that medical students who apply for residency are often married. So even if they don't end up working in the same hospital, they might care how far away from each other the hospitals are they end up working at. In a grouping problem they are only allowed to care whether they end up together or not.
+
+
+Different restrictions apply to the \textbf{roommate problem}, also outlined by \cite{galeshapley62} where the structural constraint regarding composition is relaxed, but the one regarding cardinality mostly remains the same as in the stable-marriage problem. This means that each participant has a preference profile which ranks \textbf{all} other agents. Each agent can have a maximum of one roommate, and in most discussions of the problem it is possible for an agent to have no pair, or to rank themselves above others, therefore rendering them unacceptable roommates. \cite{galeshapley62} quickly show that this problem doesn't necessarily have a stable solution with the same stability definition used in the marriage problem. \cite{irving85} shows an efficient algorithm to find a stable solution for the roommate problem, which also halts if one does not exist. Although this doesn't generalize the stability of such problems, \cite{tan91} shows a necessary and sufficient condition for a stable matching with strict preference profiles, while \cite{chung00} shows a sufficient condition for the case where weak preferences are allowed.
+
+\subsection{Stability in grouping}
+
+A definition for stability, that can be reduced to all other stability definitions of more restricted problems is that of group stability.
+
+\begin{mydef}
+A grouping $\mu$ is \textbf{group stable} if there does not exist a set of agents, who all prefer being in the group consisting only of themselves to their current assignment.
+\end{mydef}
+
+Stability has been defined in different ways in the past, when the problem got a little bit more complicated. For the roommate problem \cite{irving94sta} distinguishes between \textit{super-stability} and \textit{weak stability}, in the case when the preference list is a partial order. The only difference between these kind of stability definitions is that a matching can be \textit{weakly stable} even if an agent is indifferent between their current partner and a potential one who prefers them over the current one, but it cannot be \textit{super-stable} if this is the case. \cite{irving02} show that even in these cases where the difference is slight, algorithms finding matchings which satisfy differently defined stability definitions can be very different both in structure and in complexity. This differentiation can be even more significant in the case of groupings.
+
+\section{Algorithms}
+
+\subsection{Simple Reduction of Possible Matchings}
+
+Similarly to the roommate problem, it is possible to narrow down the solutions of a grouping problem to ones where stability might actually be achievable. This can be done using an algorithm similar to the one described in \citep{irving85}. Instead of directly proposing to each other, agents propose group ideas to everyone in their desired group. However, there are a number of crucial differences.
+
+First of all, the first phase of Irving's algorithm halts, when either all agents hold a proposal, or all of one agent's proposals get rejected. In a roommate problem, these are very similar. In that case, all of one agent's proposals can only be rejected, if everyone else holds one proposal from an agent they prefer to the one getting rejected. Since the number of proposals held, can not be fewer, than the number of agents who proposed at least once, all agents proposed at least once. In a grouping problem, since one agent can propose a group idea to more than one agent, the previous inequality does not hold.
+
+Also, in a grouping problem, an agent can't reject a proposed group as easily as in a roommate problem. The whole point of rejecting a proposal, is that the agent who rejects it, can only end up better in any stable matching. If an agent receives two different group proposals in a grouping problem, he can only reject one, if everyone else in the other group supports that proposal. Take Example \ref{ex:g5}
+
+\begin{myex}
+
+\label{ex:g5}
+Take a grouping problem with five agents,$ \{ \alpha_1, \alpha_2, \alpha_3, \alpha_4, \alpha_5\} $ and need to construct any kinds of groups. The preference profiles are according to Table \ref{tab:g5} 
+\end{myex}
+
+\begin{table}[h]
+\centering
+\caption{Preference Profiles in Example \ref{ex:g5}}
+\label{tab:g5}
+\begin{tabular}{lllll}
+Profile     & Preference 1              & Preference 2              & Preference 3   & Preference 4 \\
+$\Omega_1$: & $\{\alpha_4\}$            & $\{\alpha_2 , \alpha_4\}$ & $\{\alpha_3\}$ & arbitrary    \\
+$\Omega_2$: & $\{\alpha_1 , \alpha_5\}$ & $\{\alpha_1 , \alpha_4\}$ & $\{\alpha_1\}$ & arbitrary    \\
+$\Omega_3$: & $\{\alpha_5\}$            & $\{\alpha_1\}$            & $\{\alpha_2\}$ & arbitrary    \\
+$\Omega_4$: & $\{\alpha_3\}$            & $\{\alpha_1 , \alpha_2\}$ & $\{\alpha_1\}$ & arbitrary    \\
+$\Omega_5$: & $\{\alpha_4\}$            & $\{\alpha_1 , \alpha_2\}$ & $\{\alpha_3\}$ & arbitrary   
+\end{tabular}
+\end{table}
+
+Following a regular propose, hold/reject algorithm, in example \ref{ex:g5} the following would happen:
+
+\begin{itemize}
+\item $\alpha_1$ proposes to $\alpha_4$, $\alpha_4$ holds his proposal
+\item $\alpha_2$ proposes a group to $\alpha_1$ and $\alpha_5$, both hold his proposal
+\item $\alpha_3$ proposes to $\alpha_5$, $\alpha_5$ rejects his proposal because he holds a better one, which is the group $\{ \alpha_1 , \alpha_2 \}$
+\end{itemize}
+
+Now, $\alpha_5$ rejecting the proposal of $\alpha_3$ is a problem, since  the grouping which creates the groups $\{\alpha_3 , \alpha_5 \}$ and $\{ \alpha_1 , \alpha_2 , \alpha_4 \}$ is a group stable one. Furthermore, a matching that includes the group $\{ \alpha_1 , \alpha_2 , \alpha_5 \}$, the prospect of which caused $\alpha_5$ to reject $\alpha_3$ is not stable, because $\alpha_1$ would be willing to leave that group, in order to create $ \{ \alpha_1 , \alpha_3 \}$ which would also suit $\alpha_3$.
+
+So let's define this part of the algorithm a little more clearly. For now, disregard complexity and concentrate on lucidity. Solving the current problem, use Definition \ref{def:cons} to clarify that an agent is only allowed to use a proposal to reject any other proposal if it is \textbf{considerable}.
+
+\begin{mydef}
+\label{def:cons}
+A proposal is \textbf{considerable} for an agent if all other members in it propose it.
+\end{mydef}
+
+
+%\begin{myalg}
+
+%\label{alg:red1}
+
+\begin{algorithm}[H]
+   \SetKw{KwSt}{Start}
+   \SetKw{KwOr}{or}
+   \SetKw{KwIn}{in}
+   \SetKw{KwTe}{Halt}
+   \SetKw{KwSk}{skip}
+   \SetKw{KwBr}{break}
+   %\KwSt\;
+   %$M' = M$\;
+   \While{for some $\alpha \in A$ no one holds the proposal of $\alpha$}{
+        \For{$\alpha_i$ \KwIn $A$ $\setminus$ \{agents someone holds a proposal for\} }{
+            %\If{someone holds $\alpha_i$'s proposal}{
+            %   \KwSk\;
+            %}
+            \eIf{$M(\alpha_i) \neq \emptyset$}{
+                $H$ = the agent(s) $\alpha_i$ ranks highest form $M(\alpha_i)$\;
+                $\alpha_i$ proposes to agent(s) in $H$\;
+                \For{$\alpha_j$ in $H$}{
+                    \eIf{$\alpha_j$ holds a considerable proposal he prefers to $\alpha_i$'s}{
+                        $\alpha_j$ rejects $\alpha_i$'s proposal\;
+                        $M$ gets reduced to matchings where $H \cup \{\alpha_i\}$ can not form\;
+                        \KwBr
+                    }{
+                        $\alpha_j$ holds $\alpha_i$'s proposal\;
+                        \If{$\alpha_j$ can consider $\alpha_i$'s proposal}{
+                            $\alpha_j$ rejects all other proposals he prefers $H$ to\;
+                        }
+                    }
+                }
+            }{
+                \KwTe\;
+            }
+        }
+    }
+    \caption{Basic Reduction\label{alg:bas}}
+    %\KwTe\;
+\end{algorithm}
+    
+
+%\end{myalg}
+Using this algorithm, Example \ref{ex:g5} turns out as follows
+
+\begin{itemize}
+\item $\alpha_1$ proposes to $\alpha_4$, $\alpha_4$ holds his proposal
+\item $\alpha_2$ proposes a group to $\alpha_1$ and $\alpha_5$, both hold his proposal
+\item $\alpha_3$ proposes to $\alpha_5$, $\alpha_5$ holds his proposal because he can't use the group $\{ \alpha_1 , \alpha_2 \}$ to reject it
+\item $\alpha_4$ proposes to $\alpha_3$, $\alpha_3$ holds his proposal
+\item $\alpha_5$ proposes to $\alpha_4$, $\alpha_4$ rejects his proposal
+\item $\alpha_5$ proposes a group to $\alpha_1$ and $\alpha_2$, both hold his proposal
+\end{itemize}
+
+This is still far from a solution, but instead of rejecting a proposal that would actually work, the possible group $ \{ \alpha_5 , \alpha_4 \}$ is eliminated, which can not be part of a stable solution, since $\alpha_4$ could get $\alpha_1$ and $\alpha_2$ to join him and create $\{ \alpha_1 , \alpha_2 , \alpha_4 \}$ in any case. This works in a general sense.
+
+\begin{mysta}
+\label{sta:rej}
+
+If agent $\alpha$ rejects a proposal for group $G$, that group can not form, in a group stable grouping.
+
+\end{mysta}
+
+For this to happen, $\alpha$ needs to hold a proposal for group $F$ which he is allowed to consider, and prefers to $G$. If the other members of $F$ have not proposed to anyone else before, that means group $F$ is their first preference, so they would take $\alpha$ in any matching, who would join them from $G$, therefore $G$ would be impossible in a group stable grouping. If anyone rejected any other idea of any member of $F$ before they proposed $F$ to $\alpha$, if that meant that the idea was not possible in a stable matching, $F$ de facto became their first preference, therefore the same holds. This proves Corollary \ref{sta:rej} via mathematical induction.
+
+Since $\alpha$ would reject any proposal that is less desirable than a considerable one he currently holds, Corollary \ref{sta:hold} follows from Corollary \ref{sta:rej}.
+
+\begin{mysta}
+\label{sta:hold}
+If agent $\alpha$ holds a considerable proposal for group $F$, no group can form in a group stable grouping, which is less desirable for $\alpha$ than $F$.
+\end{mysta}
+
+Using Corollary \ref{sta:hold} the algorithm can be updated and simplified, so that rejections never occur at the time of proposal. This can be achieved by instantly reducing $M$ as any agent $\alpha$ receives a considerable proposal. All possible groupings from $M$ that allow groups to form which $\alpha$ desires less than the \textbf{considerable} proposal he just received, are eliminate.
+
+\begin{algorithm}[H]
+   \SetKw{KwSt}{Start}
+   \SetKw{KwOr}{or}
+   \SetKw{KwIn}{in}
+   \SetKw{KwTe}{Halt}
+   \SetKw{KwSk}{skip}
+   \SetKw{KwBr}{break}
+   \While{for some $\alpha \in A$ no one holds the proposal of $\alpha$}{
+        \For{$\alpha_i$ \KwIn $A$ $\setminus$ \{agents someone holds a proposal for\} }{
+            \eIf{$M(\alpha_i) \neq \emptyset$}{
+                $H$ = the agent(s) $\alpha_i$ ranks highest form $M(\alpha_i)$\;
+                $\alpha_i$ proposes to agent(s) in $H$\;
+                \For{$\alpha_j$ in $H$}{
+                    $\alpha_j$ holds $\alpha_i$'s proposal\;
+                    \If{$\alpha_j$ is allowed to consider $\alpha_i$'s proposal}{
+                        $M$ gets reduced to matchings where groups $\alpha_j$ desires less than $H$ can not form\;
+                    }
+                }
+            }{
+                \KwTe\;
+            }
+        }
+    }
+    \caption{Simplified Reduction\label{alg:sim}}
+    %\KwTe\;
+\end{algorithm}
+
+Going back to Example \ref{ex:g5}, the only difference in the steps from Basic Reduction is $\alpha_5$ does not propose to $\alpha_4$. The possibility of $\{ \alpha_4, \alpha_5 \}$ was discarded, when $\alpha_4$ received a considerable proposal from $\alpha_1$.
+
+In Example \ref{ex:g5} when either Basic or Simplified Reduction halts, everyone holds a proposal and all agents have a proposal held by someone. However $\alpha_2$ doesn't hold a proposal that he is allowed to consider, and $\alpha_5$ holds two, a considerable and a non-considerable one. Proceeding is not straightforward. Looking at this particular case, the idea of $\{ \alpha_1 , \alpha_2 , \alpha_5 \}$ is halting progress. This group can not form in a group stable grouping, since $\alpha_1$ could pair up with $\alpha_3$, for both their benefits, however our algorithm has not yet eliminated it. For this to happen, $\alpha_3$ would need to propose to $\alpha_1$ so that everyone could move on, but he would need to do this, without totally letting go of the idea of $\{ \alpha_3, \alpha_5 \}$, since as seen earlier, that is possible in a group stable grouping.
+
+\subsection{Processing of Reduced Problem}
+
+\cite{tan91} differentiates between two ways of discussing possibly achieving stability in a roommate problem. A logical one, which he proceeds to do, and an algorithmical one which he says can be deduced from \cite{irving85}. For now, I will stick to the algorithmical approach. First of all, I will propose an algorithm, that is the extension of the previously discussed ones, and also does the job, of what the second phase of Irving's algorithm is supposed to do, so it scales down to a roommate problem. 
+
+Irving' second phase essentially identifies things similar to what \cite{tan91} calls semi-party permutations or \cite{chung00} calls rings, on the remaining possible pairings. Directly doing this in a grouping problem is not possible, so an alternative method needs to be found that does something similar.
+
+An arbitrary agent $\alpha_i$ with at least two remaining possible groupings, is forced to propose to his next available choice. Afterwards, an identical simplified reduction algorithm follows. However, this way there is an additional possibility not discussed previously. The first choice of $\alpha_i$ was not eliminated from the possible groups, he was only forced to move on. This way it is possible for alpha to receive the proposal from which he was forced to move on. This part of the algorithm can not continue from that, since this will have great stability implications. Before proving this, I outline the algorithm more precisely.
+
+Take the algorithm as a function. Pass a grouping problem to the algorithm that has been already subjected to the Simplified Reduction. The self-evident parameters are $A$ the set of agents and $M$ the remaining possible matchings, and although not formally used in the pseudo-code, include $\Omega$ as a complete preference profile. Also pass to the function what proposal agents were forced to move on from. Denote this group $J$ and call it an exception. This way the function can be seen in Algorithm \ref{alg:fun}.
+
+At the beginning of the function some agents \textbf{move on}. This means that for all agents $\alpha_i$ who have a proposal held by $J \setminus \alpha_i$,  $J \setminus \alpha_i$ get removed from $M(\alpha_i)$, so that they don't propose it again. However, since they prefer that to anything else they will propose later, if they get proposals for it from all other agents in the group who weren't forced to move on, they can consider it.\footnote{Note that this only matters if more than one agent moved on}
+
+\begin{algorithm}[H]
+   \SetKwProg{Fn}{Function}{\string:}{}
+   \SetKw{KwSt}{Start}
+   \SetKw{KwOr}{or}
+   \SetKw{KwIn}{in}
+   \SetKw{KwTe}{Halt}
+   \SetKw{KwSk}{skip}
+   \SetKw{KwRe}{Return}
+    \Fn{process($A$,$M$,$\Omega$,$J$)}{
+        all agents who most prefer to be in $J$ move on\;
+        \While{for some $\alpha \in A$ no one holds the proposal of $\alpha$}{
+            \For{$\alpha_i$ \KwIn $A$ $\setminus$ \{agents someone holds a proposal for\} }{
+                \eIf{$M(\alpha_i) \neq \emptyset$}{
+                    $H$ = the agent(s) $\alpha_i$ ranks highest form $M(\alpha_i)$\;
+                    $\alpha_i$ proposes to agent(s) in $H$\;
+                    \For{$\alpha_j$ in $H$}{
+                        $\alpha_j$ holds $\alpha_i$'s proposal\;
+                        \If{$\alpha_j$ is allowed to consider $\alpha_i$'s proposal}{
+                            \If{$H \cup \alpha_i = J$}{
+                                \KwRe 1\;
+                            }
+                            $M$ gets reduced to matchings where groups $\alpha_j$ desires less than $H$ can not form\;
+                        }
+                    }
+                }{
+                    \KwRe 0\;
+                }
+            }
+        }
+        \KwRe $M$ \;
+    }
+    \caption{Processing Function\label{alg:fun}}
+    %\KwTe\;
+\end{algorithm}
+
+See that the function can either return with a further reduced problem, a $1$ or a $0$. The $0$ value is the one where one agent runs out of groups to propose to. This obviously means no stable grouping is possible, if agents move on from $J$. As discussed above, return value $1$ is new, and has implications regarding possible stable solutions. The return value $1$ means that someone who was forced to move on from $J$, received $J$ as a considerable proposal. An important statement can be deduced from this.
+
+\begin{mysta}
+\label{sta:ret1}
+
+If the function from Algorithm \ref{alg:fun} returns with value 1 for any $\langle A,M,\Omega,J \rangle$ reduced grouping problem with $J$ exception, no group stable solution exists where $J$ doesn't form.
+
+\end{mysta}
+
+The function returns 1 if and only if the last agent in $J$ who has not proposed it yet, proposes to the others. In order for $J$ to be a considerable proposal, everyone other than the one(s) moving on at the beginning, has to reach a stage where they propose it. On one hand, following from Corollary \ref{sta:rej}, this means that for all the agents in $J$, there is no better option in a stable grouping than $J$, as all others got rejected. On the other hand, following Corollary \ref{sta:hold} no group can form which is less preferred by anyone in $J$ than $J$ either.
+
+Table \ref{tab:g5red} shows how this turns out in Example \ref{ex:g5} with the remaining preferences after the problem has been subjected to Simplified Reduction, with the discarded possibilities crossed out.
+
+
+\begin{table}[h]
+\centering
+\caption{Reduced Preference Profiles in Example \ref{ex:g5}}
+\label{tab:g5red}
+\begin{tabular}{lllll}
+Profile     & Preference 1              & Preference 2              & Preference 3   & Preference 4 \\
+$\Omega_1$: & $\{\alpha_4\}$            & $\{\alpha_2 , \alpha_4\}$ & $\{\alpha_3\}$ & arbitrary    \\
+$\Omega_2$: & $\{\alpha_1 , \alpha_5\}$ & $\{\alpha_1 , \alpha_4\}$ & $\{\alpha_1\}$ & arbitrary    \\
+$\Omega_3$: & $\{\alpha_5\}$            & $\{\alpha_1\}$            & $\{\alpha_2\}$ & arbitrary    \\
+$\Omega_4$: & $\{\alpha_3\}$            & $\{\alpha_1 , \alpha_2\}$ & $\{\alpha_1\}$ & \sout{arbitrary}    \\
+$\Omega_5$: & \sout{$\{\alpha_4\}$}            & $\{\alpha_1 , \alpha_2\}$ & $\{\alpha_3\}$ & \sout{arbitrary}   
+\end{tabular}
+\end{table}
+
+After Simplified Reduction halted, everyone has a pending proposal, an agent needs to be selected to force to move on. Take $\alpha_3$. This way the processing function turns out as follows:
+
+\begin{itemize}
+\item $\alpha_3$ proposes to $\alpha_1$, $\alpha_1$ rejects all possibilities other than $\{\alpha_4\}$ and $\{\alpha_2 , \alpha_4\}$
+\item $\alpha_5$ proposes to $\alpha_3$
+\item function returns 1
+\end{itemize}
+
+So this would mean that $\{\alpha_3 , \alpha_5\}$ has to form in a stable grouping in Example \ref{ex:g5}. If it doesn't form, $\alpha_3$ would gladly leave anything else for it, while $\alpha_5$ could only possibly stay in $\{\alpha_1 , \alpha_2, \alpha_5\}$, which is not possible because $\alpha_1$ would leave for $\alpha_3$ who has no better option available.
+
+\subsection{Recursion}
+
+Algorithm \ref{alg:fun} can reduce the set of possible matchings even further, with a very similar algorithm to Simplified Reduction. This points to the possibility of creating a recursive function that eventually either returns with a stable grouping, or shows that one does not exist. Algorithm \ref{alg:fun} can show that forcing agents to move on from their first preference might result in eliminating all stable solutions. This needs a little more clarification, but it is fairly straightforward. The more important question that remains, is what happens when the function returns with a further reduced $M$.
+
+First of all, look at what happens when the function in Algorithm \ref{alg:fun} returns with 0. This means that one agent ran out of possible groups to propose to. It's a similar case to when the function returns 1, in the sense that no stable solution can form after moving on from $J$. I will later show that these cases are essentially identical.
+
+One seemingly problematic aspect of the function returning with $M$ is that further reduction might be done multiple times, so more than one moving on could be forced. This way our function needs to remember what $J$-s, and which agents moved on from. This can be achieved with the effect moving on has on $M$, more precisely $M(\alpha_i)$. Following the logic of the processing function, if any of the groups that agents moved on from gets confirmed - so all the agents who have not moved on from it propose it - the last moving on was incorrect. Even though there is a special case in the Processing Function for this event, it was not necessary. Note that as if any $\alpha_i$ receives a considerable offer for any group $J$ he has moved on from, as \textit{$M$ gets reduced to matchings where groups $\alpha_i$ desires less than $J$ can not form} happens, $M(\alpha_i) \neq \emptyset$ won't be true any more, so the function reports that no stable solution can be found. It is important to note here, that even though $J$ has been removed from $M(\alpha_i)$ when $\alpha_i$ was forced to move on from it, $\Omega_i$ can still determine how it compares to other groups that remain in $M(\alpha_i)$, since $\Omega_i$ did not change, it was specified for the original $M(\alpha_i)$.
+
+Agents need to systematically attempt to move on within the function, until they only have one option left, or one of them runs out. An important element of this process, is that all agents are required to have a proposal held before some are forced to move on. This algorithm is defined precisely as follows.
+
+
+\begin{algorithm}[H]
+   \SetKwProg{Fn}{Function}{\string:}{}
+   \SetKw{KwSt}{Start}
+   \SetKw{KwOr}{or}
+   \SetKw{KwIn}{in}
+   \SetKw{KwTe}{Halt}
+   \SetKw{KwSk}{skip}
+   \SetKw{KwBr}{break}
+   \SetKw{KwRe}{Return}
+    \Fn{grouping($A$,$M$,$\Omega$,$J$)}{
+        all agents who most prefer to be in $J$ move on\;
+        \While{some $\alpha \in A$ has a group left to propose to}{
+            \While{\{agents someone holds a proposal for\} $\neq$ $A$}{
+                \For{$\alpha_i$ \KwIn $A$ $\setminus$ \{agents someone holds a proposal for\} }{
+                    \eIf{$M(\alpha_i) \neq \emptyset$}{
+                        $H$ = the agent(s) $\alpha_i$ ranks highest form $M(\alpha_i)$\;
+                        $\alpha_i$ proposes to agent(s) in $H$\;
+                        \For{$\alpha_j$ in $H$}{
+                            $\alpha_j$ holds $\alpha_i$'s proposal\;
+                            \If{$\alpha_j$ is allowed to consider $\alpha_i$'s proposal}{
+                                $M$ gets reduced to matchings where groups $\alpha_j$ desires less than $H$ can not form\;
+                            }
+                        }
+                    }{
+                        \KwRe 0\;
+                    }
+                }
+            }
+            \For{$\alpha_i$ \KwIn $A$ }{
+                \If{$\alpha_i$ has a group left to propose to}{
+                    $K$ = $\alpha_i$'s 1st preference of the groups left to propose to\;
+                    \eIf{grouping($A$,$M$,$\Omega$,$K$) = 0}
+                    {
+                        $M$ gets reduced to matchings where groups $\alpha_i$ desires less than $K$ can not form\;
+                    }{
+                        $M$ = grouping($A$,$M$,$\Omega$,$K$)
+                    }
+                    \KwBr\;
+                }
+            }
+        }
+        \KwRe $M$\;
+    }
+    \caption{Recursive Grouping Function \label{alg:rec}}
+    %\KwTe\;
+\end{algorithm}
+
+Following Corollary \ref{sta:rej} and Corollary \ref{sta:hold}, while looking at Corollary \ref{sta:ret1} in the current context, the second part of the algorithm sufficiently determines whether an agent can move on from their current outgoing proposal, and still possibly find a stable grouping. If it is not possible, \textit{$M$ gets reduced to matchings where groups $\alpha_i$ desires less than $K$ can not form} so the algorithm continues and disregards all possible groupings where groups are allowed which could form after $\alpha_i$ has moved on. Note that this does not necessarily mean that the last group $\alpha_i$ moved on from needs to form, since he might have been forced to move on multiple times. It merely means that the latest try doesn't lead to stable solutions.
+
+The first part of the algorithm removes unstable and only unstable possibilities from $M$, which might already have been subjected to partial reduction due to $J$. The second part moves through agents to see what happens if definitely unstable solutions are removed after some have given up their first preference. So an agent can definitively move on from a group - even if that group could form in a stable solution - if and only if not all stable solutions have been discarded by moving on. Therefore if one stable solution is available, the algorithm will not eliminate it. If more are available, after forcing enough agents to move on, so that only one remains, the algorithm will not eliminate that one. What remains to be seen is if it reaches that one as a solution or not.
+
+All that needs to be shown, is that a case where no agent has a group to propose to arrives, and if it does, the $M$ it returns with is an actual solution. 
+
+\begin{mysta}
+\label{sta:found}
+
+In the context of Algorithm \ref{alg:rec} a solution is found if all agents have one outgoing proposal and don't have any other groups left to propose to.
+
+\end{mysta}
+
+See that if no agent has a group left to propose to, that means that no agent has moved on from a group that still might be possible. Suppose that $\alpha_i$ has moved on from group $J$ which is still among the groups that can form. Since no one can propose $J$ in the future, all other agents in $J$ have either moved on from it or are currently proposing it. That would mean that $\alpha_i$ can consider the possibility of $J$ so all other possibilities below it in $\Omega_i$ would be removed from $M$. This way the algorithm would recognise that $\alpha_i$ moving on from $J$ is not possible if a stable solution is to be reached. 
+
+So no agent has a group to move on to, and group they moved on from, so everyone has exactly one possible group left in $M$. This also means that if a group possibly forming in $M$ has $\alpha_i$ in it, no other group does. Therefore Corollary \ref{sta:found} stands.
+
+Now it is established that if Algorithm \ref{alg:rec} returns with an $M$, it is a stable solution to the problem. And if at least one stable solution is available, there will be one, the algorithm doesn't move on from. This also means that if the algorithm returns with 0, that is because no stable solution was available. So if it can be proven that the algorithm never loops indefinitely, that means that if a stable solution exists, it will find one and return one, and if one does not exist, it will return with 0.
+
+\begin{mysta}
+\label{sta:halt}
+
+Algorithm \ref{alg:rec} halts.
+
+\end{mysta}
+
+Algorithm \ref{alg:rec} can loop indefinitely if the first part never reaches the stage where all agents have outgoing proposals and no one runs out of groups to propose to. In the first part an agent will keep trying to propose to his best alternative until he runs out or has a valid outgoing proposals. Since all preference profiles rank finite sets, if his outgoing proposals keep getting eliminated from $M$, at one point they will run out, at which point the function will halt and return 0.
+
+If Algorithm \ref{alg:rec} doesn't halt in the first phase by returning 0, it will have to reach a stage where no agent has anyone left to propose to in the second phase. In this phase, if an agent $\alpha_i$ does have a group to propose to, the function recursively calls itself where agents are forced to move on from $\alpha_i$'s first choice. So the function either keeps calling itself recursively, or at one point returns 0. In both cases the possibilities agents can propose to keep decreasing, and since the possibilities are finite, it is not possible that this keeps happening indefinitely. 
+
+It is clear then that Algorithm \ref{alg:rec} finds a stable solution if there is one, and reports that there is none, if there is none.\footnote{An implementation in python 2.7 with a number of test cases can be found at \url{http://rajk.eu/borza/grouping/grouping.py}}
+
+\section{Conclusion}
+
+While the grouping problem is a strong generalization of previously discussed stable matching problems, it can still be solved in a similar fashion. 
+
+Thus I have presented a recursive algorithm with two distinct phases, which provides a stable solution if there is one, and signals if there isn't one. This shows that generalizing the more frequently discussed problems of stable matching is possible.
+
+I have only dealt with strict preferences, the problem works somewhat differently with possible weak preferences. That would also allow the college admission problem as well to be treated as a grouping problem. Preferences could also be described more eloquently. Meaning that some agents might only care if they end up together, no matter how other members of the group turn out, or agents might only care about the cardinality of the group they end up in, and so on. Complexity questions should be addressed regarding the algorithm. Also, following the logic of the algorithm, necessary and/or sufficient conditions could be found for stability. The algorithm could be modified to meet different kinds of criteria as well as group stability, like some form of optimality or minimal regret condition. How does one go about checking whether a grouping is stable or not is another question that can be addressed.
+
+
+\section*{References}
+la
+
+\end{document}
