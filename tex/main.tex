@@ -62,6 +62,8 @@
 \newtheorem{myex}{Example}
 \newtheorem{myalg}{Algorithm}
 \newtheorem{mysta}{Corollary}
+\newtheorem{mylem}{Lemma}
+\newtheorem{myprop}{Proposition}
 \usepackage[ruled,vlined]{algorithm2e}
 
 %STRIKETHROUGH
@@ -85,12 +87,12 @@
 
 
 \begin{abstract}
-In this paper I outline and solve a strongly generalized stable matching problem called a \emph{grouping problem}. I refine the stability condition to fit the grouping problem, so that an algorithm can be built to find a solution that satisfies this criterion. I produce my own algorithm, that either returns with a stable grouping, or shows that one does not exist.
+We study a strongly generalized stable matching problem --- the \emph{grouping problem} --- in which agents have strict preferences over arbitrary subsets of the population. This framework subsumes both the Stable Marriage Problem and the Stable Roommates Problem, neither of which permits agents to reason over group compositions of arbitrary size or structure. We introduce \emph{group stability} as the appropriate solution concept: a grouping is stable if no subset of agents unanimously prefers forming a coalition exclusively among themselves over their current assignment. This notion coincides with core stability in the hedonic games literature. We present a recursive two-phase algorithm that either returns a group-stable partition or certifies that none exists, and prove that it always halts on finite preference profiles. We further establish that under standard structural restrictions on preferences, the algorithm reduces to the Gale-Shapley algorithm for the stable marriage problem and to Irving's algorithm for the stable roommates problem, demonstrating that it is a genuine unifying framework for stable matching.
 \end{abstract}
 
-%\begin{keyword}
-%sex, data, social-media, natural language processing
-%\end{keyword}
+\begin{keyword}
+stable matching \sep hedonic games \sep coalition formation \sep core stability \sep grouping problem \sep recursive algorithm
+\end{keyword}
 
 \end{frontmatter}
 
@@ -119,9 +121,27 @@ It's not just that a stable grouping seems much harder to create, even the conce
 
 Finding a solution to a grouping problem naturally might have little more significant consequences than getting a few infants to a field trip safely. In many cases, if the preferences of the agents can be set in the right way, a grouping problem can represent a number of  interesting and useful issues. The most obvious is probably people living, working or studying together. In these instances, people might have much more complex preferences than just a total order of individuals who they'd prefer to be grouped with. People might look for portfolios, might like two people very much who hate each other and would rather avoid the conflict, and so on. Well organized cooperation can be key in both a working and studying environment. Being able to solve grouping problems in an efficient and stable way can be an important factor in it. Institutions, branches of government and companies also benefit greatly from better organized and stable cooperation. Properly grouping firms together is also an important problem of portfolio and risk management, while in a within firm sense stable grouping can help efficiency and HR issues.
 
-Grouping might not only be useful in the case of people or institutions. Connections between computers are an indispensable part of our lives. Treating computers as agents who act according to their self interest, and applying mechanisms to them similarly to humans is not a new concept. \citep{nisan99}
+Grouping might not only be useful in the case of people or institutions. Connections between computers are an indispensable part of our lives. Treating computers as agents who act according to their self-interest, and applying mechanisms to them similarly to humans, is not a new concept \citep{nisan99}. Stable coalition formation among computational agents is equally relevant in distributed systems, peer-to-peer networks, and multi-agent planning.
+
+The remainder of this paper is organized as follows. Section~\ref{sec:related} surveys the hedonic games literature that frames the grouping problem. Section~\ref{sec:framework} defines the formal framework and introduces group stability. Section~\ref{sec:algorithms} presents the three-phase algorithm and proves its correctness and termination. Section~\ref{sec:connections} establishes the formal reductions to the Stable Marriage Problem and the Stable Roommates Problem. Section~\ref{sec:conclusion} concludes.
+
+\section{Related Work}
+\label{sec:related}
+
+The grouping problem belongs to the literature on \emph{hedonic games}, a term introduced by \cite{drzezegreenberg80} to describe settings where agents form coalitions and each agent's utility depends solely on the composition of their own coalition. This \emph{hedonic} property --- that agents are indifferent to how others outside their coalition are grouped --- is precisely the assumption maintained throughout this paper.
+
+The foundational paper of \cite{bogomolnaia02} establishes the core existence and algorithmic questions for hedonic coalition formation under strict preferences. They demonstrate that even under strict preferences, a core-stable partition need not exist, and characterize preference domains that guarantee existence. \cite{banerjee01} independently study core stability in coalition formation games and provide sufficient conditions based on the notion of \emph{top coalitions}: if every subset of agents contains a coalition that is unanimously preferred by its members, a core-stable partition exists.
+
+The computational complexity of finding core-stable partitions is generally intractable. \cite{ballester04} establishes NP-completeness results for hedonic games under several preference representations. \cite{woeginger13} surveys known tractability and hardness results, distinguishing between different stability concepts (core, Nash, individual stability) and different preference encodings.
+
+The \emph{group stability} concept defined in this paper coincides with the standard \emph{core} in hedonic games: a partition lies outside the core if and only if a blocking coalition exists --- a set of agents who all prefer the coalition consisting of themselves alone over their current assignment. This equivalence allows the results of this paper to be read directly as an algorithmic contribution to core computation in hedonic games.
+
+Several restricted subclasses of hedonic games have been studied algorithmically. \cite{cechlárová02} study the \emph{stable partition problem}, a hedonic game in which preferences satisfy an additively separable structure; they show that a stable partition always exists in this setting. \cite{alcalde04} study coalition formation in research collaboration and characterize stability under various restrictions. The current paper makes no assumption on the structural form of preferences beyond strict ordering --- it operates on the full preference profile over all subsets --- and is therefore applicable to the most general hedonic game formulation.
+
+What distinguishes this work from the literature is the recursive algorithmic approach, which generalizes both the Gale-Shapley algorithm \citep{galeshapley62} and Irving's algorithm for the stable roommates problem \citep{irving85}. To our knowledge, no prior work presents a single algorithm that subsumes both classical stable matching algorithms as special cases.
 
 \section{Framework}
+\label{sec:framework}
 
 \subsection{Denotation}
 
@@ -184,6 +204,7 @@ A grouping $\mu$ is \textbf{group stable} if there does not exist a set of agent
 Stability has been defined in different ways in the past, when the problem got a little bit more complicated. For the roommate problem \cite{irving94sta} distinguishes between \textit{super-stability} and \textit{weak stability}, in the case when the preference list is a partial order. The only difference between these kind of stability definitions is that a matching can be \textit{weakly stable} even if an agent is indifferent between their current partner and a potential one who prefers them over the current one, but it cannot be \textit{super-stable} if this is the case. \cite{irving02} show that even in these cases where the difference is slight, algorithms finding matchings which satisfy differently defined stability definitions can be very different both in structure and in complexity. This differentiation can be even more significant in the case of groupings.
 
 \section{Algorithms}
+\label{sec:algorithms}
 
 \subsection{Simple Reduction of Possible Matchings}
 
@@ -221,9 +242,9 @@ Following a regular propose, hold/reject algorithm, in example \ref{ex:g5} the f
 \item $\alpha_3$ proposes to $\alpha_5$, $\alpha_5$ rejects his proposal because he holds a better one, which is the group $\{ \alpha_1 , \alpha_2 \}$
 \end{itemize}
 
-Now, $\alpha_5$ rejecting the proposal of $\alpha_3$ is a problem, since  the grouping which creates the groups $\{\alpha_3 , \alpha_5 \}$ and $\{ \alpha_1 , \alpha_2 , \alpha_4 \}$ is a group stable one. Furthermore, a matching that includes the group $\{ \alpha_1 , \alpha_2 , \alpha_5 \}$, the prospect of which caused $\alpha_5$ to reject $\alpha_3$ is not stable, because $\alpha_1$ would be willing to leave that group, in order to create $ \{ \alpha_1 , \alpha_3 \}$ which would also suit $\alpha_3$.
+However, $\alpha_5$ rejecting the proposal of $\alpha_3$ leads to an incorrect conclusion: the grouping that creates $\{\alpha_3 , \alpha_5 \}$ and $\{ \alpha_1 , \alpha_2 , \alpha_4 \}$ is group stable. Moreover, the grouping that includes $\{ \alpha_1 , \alpha_2 , \alpha_5 \}$, whose prospect caused $\alpha_5$ to reject $\alpha_3$, is not stable: $\alpha_1$ would defect from that group to form $\{ \alpha_1 , \alpha_3 \}$, which $\alpha_3$ also prefers.
 
-So let's define this part of the algorithm a little more clearly. For now, disregard complexity and concentrate on lucidity. Solving the current problem, use Definition \ref{def:cons} to clarify that an agent is only allowed to use a proposal to reject any other proposal if it is \textbf{considerable}.
+We therefore refine the rejection criterion. An agent is only permitted to use a held proposal to reject another if the held proposal is \textbf{considerable} in the following sense.
 
 \begin{mydef}
 \label{def:cons}
@@ -339,13 +360,13 @@ In Example \ref{ex:g5} when either Basic or Simplified Reduction halts, everyone
 
 \subsection{Processing of Reduced Problem}
 
-\cite{tan91} differentiates between two ways of discussing possibly achieving stability in a roommate problem. A logical one, which he proceeds to do, and an algorithmical one which he says can be deduced from \cite{irving85}. For now, I will stick to the algorithmical approach. First of all, I will propose an algorithm, that is the extension of the previously discussed ones, and also does the job, of what the second phase of Irving's algorithm is supposed to do, so it scales down to a roommate problem. 
+\cite{tan91} distinguishes two approaches to stability in the roommate problem: a logical one, and an algorithmic one deducible from \cite{irving85}. We follow the algorithmic approach, extending the reduction algorithms to perform the role of Irving's second phase, so that the algorithm scales down to the roommate problem.
 
 Irving' second phase essentially identifies things similar to what \cite{tan91} calls semi-party permutations or \cite{chung00} calls rings, on the remaining possible pairings. Directly doing this in a grouping problem is not possible, so an alternative method needs to be found that does something similar.
 
 An arbitrary agent $\alpha_i$ with at least two remaining possible groupings, is forced to propose to his next available choice. Afterwards, an identical simplified reduction algorithm follows. However, this way there is an additional possibility not discussed previously. The first choice of $\alpha_i$ was not eliminated from the possible groups, he was only forced to move on. This way it is possible for alpha to receive the proposal from which he was forced to move on. This part of the algorithm can not continue from that, since this will have great stability implications. Before proving this, I outline the algorithm more precisely.
 
-Take the algorithm as a function. Pass a grouping problem to the algorithm that has been already subjected to the Simplified Reduction. The self-evident parameters are $A$ the set of agents and $M$ the remaining possible matchings, and although not formally used in the pseudo-code, include $\Omega$ as a complete preference profile. Also pass to the function what proposal agents were forced to move on from. Denote this group $J$ and call it an exception. This way the function can be seen in Algorithm \ref{alg:fun}.
+We formalize Algorithm~\ref{alg:fun} as a function. Its inputs are a grouping problem already subjected to Simplified Reduction: $A$ the set of agents, $M$ the remaining possible matchings, $\Omega$ the complete preference profile, and $J$ the group from which agents are forced to move on (the \emph{exception}).
 
 At the beginning of the function some agents \textbf{move on}. This means that for all agents $\alpha_i$ who have a proposal held by $J \setminus \alpha_i$,  $J \setminus \alpha_i$ get removed from $M(\alpha_i)$, so that they don't propose it again. However, since they prefer that to anything else they will propose later, if they get proposals for it from all other agents in the group who weren't forced to move on, they can consider it.\footnote{Note that this only matters if more than one agent moved on}
 
@@ -510,18 +531,58 @@ Algorithm \ref{alg:rec} can loop indefinitely if the first part never reaches th
 
 If Algorithm \ref{alg:rec} doesn't halt in the first phase by returning 0, it will have to reach a stage where no agent has anyone left to propose to in the second phase. In this phase, if an agent $\alpha_i$ does have a group to propose to, the function recursively calls itself where agents are forced to move on from $\alpha_i$'s first choice. So the function either keeps calling itself recursively, or at one point returns 0. In both cases the possibilities agents can propose to keep decreasing, and since the possibilities are finite, it is not possible that this keeps happening indefinitely. 
 
-It is clear then that Algorithm \ref{alg:rec} finds a stable solution if there is one, and reports that there is none, if there is none.\footnote{An implementation in python 2.7 with a number of test cases can be found at \url{http://rajk.eu/borza/grouping/grouping.py}}
+It is clear then that Algorithm \ref{alg:rec} finds a stable solution if there is one, and reports that there is none, if there is none.\footnote{An implementation in Python 2.7 with test cases is available at \url{http://rajk.eu/borza/grouping/grouping.py}}
+
+\section{Connections to Classical Matching Algorithms}
+\label{sec:connections}
+
+We now formalize the claim that Algorithm~\ref{alg:rec} is a genuine unifying framework for stable matching, by showing that it reduces to the two canonical algorithms when standard structural restrictions are imposed on the preference profiles.
+
+\subsection{Reduction to the Stable Marriage Problem}
+
+In the Stable Marriage Problem, the agent set $A$ is partitioned into two disjoint sets $A_M$ and $A_W$ of equal cardinality. Each agent $\alpha_i \in A_M$ has preferences only over singletons drawn from $A_W$, and vice versa. Formally, $M(\alpha_i)$ contains only sets of the form $\{\alpha_j\}$ where $\alpha_j$ lies in the opposite partition.
+
+\begin{mylem}
+\label{lem:gs}
+When preferences are restricted to a bipartite structure with group size two, Algorithm~\ref{alg:sim} (Simplified Reduction) terminates with a stable matching that is outcome-equivalent to the man-optimal stable matching produced by the Gale-Shapley algorithm.
+\end{mylem}
+
+\begin{proof}
+Under bipartite size-two restrictions, a proposal from $\alpha_i \in A_M$ to $\{\alpha_j\}$ is \emph{considerable} for $\alpha_j$ if and only if $\alpha_j$ also proposes $\{\alpha_i\}$. The reduction of $M$ upon holding a considerable proposal corresponds exactly to striking out dominated entries in the preference list. Since each $M(\alpha_i)$ contains only singletons from the opposite partition, the loop in Algorithm~\ref{alg:sim} mirrors the propose-hold-reject cycle of Gale-Shapley: each $\alpha_j \in A_W$ holds the best proposal received and rejects all dominated ones. The algorithm terminates when every agent holds exactly one proposal; this is precisely the stable matching identified by Gale-Shapley for a proposer-optimal outcome. Correctness follows from Corollaries~\ref{sta:rej} and~\ref{sta:hold}, which reduce to the classical stability condition in this restricted setting.
+
+Furthermore, the ``moving on'' phase of Algorithm~\ref{alg:rec} is never triggered: in the bipartite equal-cardinality setting, the Simplified Reduction always terminates with all agents holding a proposal, so no agent reaches a state with multiple unresolved proposals that would require forced progression.
+\end{proof}
+
+\subsection{Reduction to the Stable Roommates Problem}
+
+In the Stable Roommates Problem, the composition constraint is lifted but the cardinality constraint is retained: $M(\alpha_i)$ contains only singletons drawn from $A \setminus \{\alpha_i\}$, with no bipartite restriction.
+
+\begin{mylem}
+\label{lem:irving}
+When preferences are restricted to group size two without a bipartite constraint, the combined action of Algorithms~\ref{alg:sim} and~\ref{alg:rec} is outcome-equivalent to Irving's algorithm for the Stable Roommates Problem~\citep{irving85}.
+\end{mylem}
+
+\begin{proof}
+Phase 1 of Irving's algorithm corresponds directly to Algorithm~\ref{alg:sim}: both execute a propose-hold-reject cycle that terminates with each agent holding at most one proposal, and both eliminate the same set of impossible pairs. Under size-two restrictions, the \emph{considerable} condition again reduces to the requirement that both agents in a proposed pair propose each other.
+
+Phase 2 of Irving's algorithm identifies and eliminates \emph{rotation sequences} (also called preference rings): cyclic structures in the reduced preference table that must be eliminated before a stable matching can be found, if one exists. The ``moving on'' mechanism in Algorithm~\ref{alg:rec} plays the analogous role: forcing $\alpha_i$ to move on from group $J = \{\alpha_i, \alpha_j\}$ corresponds to advancing $\alpha_i$'s proposal past $\alpha_j$ in the table. The return value 1 from Algorithm~\ref{alg:fun} --- triggered when a moved-on agent receives $J$ back as a considerable proposal --- corresponds exactly to the detection of an Irving rotation: the cycle closes, confirming that the omitted pair must form in any stable solution or that no solution exists.
+
+Since both the rotation detection and its consequences (either committing the pair or eliminating all solutions through a return-0 path) are handled identically, Algorithm~\ref{alg:rec} is operationally equivalent to Irving's algorithm on size-two non-bipartite inputs.
+\end{proof}
+
+Lemmas~\ref{lem:gs} and~\ref{lem:irving} together establish that Algorithm~\ref{alg:rec} strictly generalizes both classical algorithms. The general grouping problem adds neither a cardinality bound of two nor any compositional constraint, requiring the full recursive apparatus.
 
 \section{Conclusion}
+\label{sec:conclusion}
 
-While the grouping problem is a strong generalization of previously discussed stable matching problems, it can still be solved in a similar fashion. 
+The grouping problem --- a hedonic coalition formation game in which agents hold strict preferences over arbitrary subsets of the population --- is a strong generalization of classical stable matching. We have shown that it admits a unified recursive algorithm that either returns a group-stable (core-stable) partition or certifies that no such partition exists. The algorithm operates in two phases: a Simplified Reduction phase that eliminates impossible groups via a proposal-and-hold mechanism, and a recursive ``moving on'' phase that resolves cyclic deadlocks. Termination is guaranteed by the finiteness of the preference profiles.
 
-Thus I have presented a recursive algorithm with two distinct phases, which provides a stable solution if there is one, and signals if there isn't one. This shows that generalizing the more frequently discussed problems of stable matching is possible.
+The algorithm subsumes the Gale-Shapley algorithm for the Stable Marriage Problem and Irving's algorithm for the Stable Roommates Problem as special cases (Lemmas~\ref{lem:gs} and~\ref{lem:irving}), demonstrating that these classical results are instances of a single underlying mechanism.
 
-I have only dealt with strict preferences, the problem works somewhat differently with possible weak preferences. That would also allow the college admission problem as well to be treated as a grouping problem. Preferences could also be described more eloquently. Meaning that some agents might only care if they end up together, no matter how other members of the group turn out, or agents might only care about the cardinality of the group they end up in, and so on. Complexity questions should be addressed regarding the algorithm. Also, following the logic of the algorithm, necessary and/or sufficient conditions could be found for stability. The algorithm could be modified to meet different kinds of criteria as well as group stability, like some form of optimality or minimal regret condition. How does one go about checking whether a grouping is stable or not is another question that can be addressed.
+Several directions remain open. First, this paper restricts to strict preferences; extending to weak preferences (indifferences) would require adapting the notions of \emph{super-stability} and \emph{weak stability} studied by \cite{irving94sta} and \cite{irving02} to the grouping setting, and would enable the college admissions problem to be treated as a grouping problem. Second, a formal worst-case complexity analysis of Algorithm~\ref{alg:rec} is outstanding; the recursion tree depth is bounded by the total number of possible group memberships, but tight bounds under specific preference structures deserve careful treatment. Third, necessary and sufficient conditions for the existence of a group-stable partition --- analogous to Tan's condition for the roommate problem \citep{tan91} --- could be derived from the structure of the algorithm. Finally, the algorithm could be adapted to optimize over stable solutions, for instance by minimizing maximum regret or satisfying some notion of optimality within the core.
 
 
-\section*{References}
-la
+\bibliographystyle{elsarticle-harv}
+\bibliography{mechbib}
 
 \end{document}

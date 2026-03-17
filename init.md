@@ -1,84 +1,43 @@
-```markdown
-# A Unifying Recursive Algorithm for Core-Stable Partitions in Generalized Matching
+# Generalized Stable Matching as Hedonic Coalition Formation
 
-## Abstract
-[cite_start]Simple algorithms matching two agents pairwise have had a wide range of applications, from assigning residents to hospitals to matching kidney donors[cite: 8, 9]. [cite_start]However, stability is traditionally difficult to achieve or guarantee in highly generalized grouping problems where agents have preferences over arbitrary subsets of the population[cite: 13, 14, 41]. [cite_start]This paper outlines a heavily generalized stable matching problem—modernly framed as a Hedonic Game—and provides a recursive algorithm to find a group-stable matching or prove none exists[cite: 4, 6]. Crucially, this algorithm acts as a unifying mechanism: by simply applying structural constraints on the preference profiles, it elegantly collapses to solve both the bipartite Stable Marriage Problem and the non-bipartite Stable Roommates Problem.
+## Current Paper Structure (as of 2026-03-15)
 
-## 1. Introduction
-Historically, stability in matching has been defined and solved within strict constraints. [cite_start]In the Stable Marriage problem, matching sets must have a cardinality of two, drawn from two distinct categories[cite: 56, 57]. [cite_start]In the Stable Roommates problem, the bipartite constraint is relaxed, but the cardinality constraint remains[cite: 83]. 
+### Section 1: Introduction
+Motivates the grouping problem via applications (hospital-resident, kidney exchange, school assignment, team formation). Establishes the combinatorial explosion: $2^p - 1$ possible coalitions per agent. Uses kindergarten field-trip example to motivate different stability definitions. Ends with roadmap to remaining sections.
 
-[cite_start]When these constraints are eliminated, an agent in a population of $p$ agents evaluates $2^{p}-1$ possible reconnections[cite: 14]. [cite_start]This introduces massive complexity, as an agent evaluates a total order on the powerset of the population excluding themselves[cite: 41].
+### Section 2: Related Work *(new)*
+Connects the paper to hedonic games literature. Establishes that "group stability" = core stability. Cites Drèze & Greenberg (1980), Bogomolnaia & Jackson (2002), Banerjee et al. (2001), Ballester (2004), Woeginger (2013), Cechlárová & Romero-Medina (2002), Alcalde & Revilla (2004). Positions the contribution: no prior single algorithm subsumes both Gale-Shapley and Irving.
 
-**[TODO 1: Insert modern Literature Review here. Define this as a Hedonic Coalition Formation Game. Cite recent works on Core-Stability to replace the older "Group Stability" terminology.]**
+### Section 3: Framework
+Formal notation: $\langle A, \mathbf{\Omega}, M \rangle$. Reviews marriage problem, college admissions, roommates problem. Defines group stability (Definition 1).
 
-## 2. Framework and Stability
-[cite_start]In our generalized grouping problem, an $A$ set of agents needs to be organized into groups[cite: 39]. [cite_start]Each agent $\alpha_{i}$ has a preference profile $\Omega_{i}$, which is a total order on the powerset of $A$ without $\alpha_{i}$[cite: 40, 41]. 
+### Section 4: Algorithms
+- **4.1 Simple Reduction**: Basic Reduction (Algorithm 1) and Simplified Reduction (Algorithm 2). Introduces *considerable* proposals (Definition 2). Corollaries 1 and 2.
+- **4.2 Processing of Reduced Problem**: Processing Function (Algorithm 3). Introduces *moving on* and *exceptions*. Corollary 3.
+- **4.3 Recursion**: Recursive Grouping Function (Algorithm 4). Corollaries 4 (solution found) and 5 (halting).
+- Worked example: 5-agent case (Tables 1-2) traced through all phases.
 
-We define stability as follows:
-[cite_start]**Definition (Core/Group Stability):** A grouping is stable if there does not exist a set of agents who all prefer being in a group consisting only of themselves to their current assignment[cite: 93].
+### Section 5: Connections to Classical Matching Algorithms *(new)*
+- Lemma 1: under bipartite size-2 restrictions, Algorithm 2 = Gale-Shapley. Moving-on never triggers.
+- Lemma 2: under non-bipartite size-2 restrictions, Algorithms 2+4 = Irving. Moving-on = rotation elimination.
 
-**[TODO 2: The "Reduction to Classical Matching" Section. Explicitly demonstrate mathematically how restricting $\Omega_{i}$ to bipartite size-2 sets mirrors Gale-Shapley, and restricting to complete graph size-2 sets mirrors Irving's algorithm.]**
+### Section 6: Conclusion
+Summarizes contribution. Open directions: weak preferences, complexity analysis, existence conditions, optimality within the core.
 
-## 3. The Algorithm
-The generalized algorithm operates through a multi-phase process of reduction and recursion.
+---
 
-### 3.1 Simplified Reduction
-[cite_start]Agents are only allowed to use a proposal to reject another proposal if it is "considerable"—meaning all other members in the proposed group also propose it[cite: 126, 127]. [cite_start]If an agent holds a considerable proposal for group $F$, no group can form in a stable grouping which is less desirable for that agent than $F$[cite: 148]. 
+## Remaining Work
 
-```python
-# Simplified Reduction Algorithm 
-while for some a in A no one holds the proposal of a do
-  for a_i in A \ {agents someone holds a proposal for} do
-    if M(a_i) != empty then
-      H = the agent(s) a_i ranks highest from M(a_i)
-      a_i proposes to agent(s) in H
-      for a_j in H do
-        a_j holds a_i's proposal
-        if a_j is allowed to consider a_i's proposal then
-          M gets reduced to matchings where groups a_j desires less than H cannot form
-        else
-          Halt
+### Must-have for submission
+1. **Complexity analysis** — worst-case Big-O for Algorithm 4. The recursion tree has branching factor $\leq p$ and depth $\leq N = \sum_i |M(\alpha_i)|$. Each node runs Simplified Reduction costing at most $O(N^2)$. Worst case is therefore $O(p^N \cdot N^2)$, but expected behavior on structured instances should be much better. This needs formal treatment and honest discussion of the overhead vs. specialized algorithms.
+2. **Tighten Lemma 1 proof** — the "considerable" condition under bipartite size-2 is not simply "α_j also proposes {α_i}"; it's that α_j's current best held proposal is from α_i. The proof needs to walk through the GS invariant more carefully.
+3. **Tighten Lemma 2 proof** — the correspondence between "moving on" and Irving rotations needs to show the cycle structure explicitly, not just assert analogy.
 
-```
+### Should-have for competitive submission
+4. **Empirical validation** — Python 3 implementation + Monte Carlo for $p = 5, 10, 15, 20$. Runtime graphs vs. $p$. Existence frequency of stable groupings vs. $p$.
+5. **Formal theorem numbering** — Corollaries 1-5 should be Propositions or Theorems. The proofs are currently inline prose; they need `\begin{proof}...\end{proof}` environments.
+6. **Language polish** — remaining first-person "I" usages in Sections 3-4 should become "we". Some informal passages ("It's not just that...", "Take a simple example") could be tightened for a CS theory audience.
 
-*[Adapted from Simplified Reduction: cite: 152]*
-
-### 3.2 Recursion and "Moving On"
-
-To resolve deadlocks (analogous to rings in the roommate problem), the algorithm forces an arbitrary agent to "move on" to their next available choice, systematically tracking these exceptions. If forcing an agent to move on results in all stable solutions being discarded, the algorithm recognizes this and restores the necessary path.
-
-```python
-# Recursive Grouping Function
-Function grouping(A, M, Omega, J):
-  all agents who most prefer to be in J move on
-  
-  while some a in A has a group left to propose to do
-    while {agents someone holds a proposal for} != A do
-      # ... [Simplified Reduction Logic applied here] ...
-      
-    for a_i in A do
-      if a_i has a group left to propose to then
-        K = a_i's 1st preference of the groups left to propose to
-        if grouping(A, M, Omega, K) == 0 then
-          M gets reduced to matchings where groups a_i desires less than K cannot form
-        else
-          M = grouping(A, M, Omega, K)
-          break
-          
-  Return M
-
-```
-
-*[Adapted from Algorithm 4: cite: 228, 229]*
-
-If the algorithm returns $M$, it is a stable solution. If it returns 0, no stable solution was available. Because the possibilities are finite, the recursive function is guaranteed to halt.
-
-**[TODO 3: Formal Big-O Complexity Analysis. Define the worst-case runtime for the recursion tree and the reduction phase.]**
-
-## 4. Conclusion
-
-While the grouping problem is a strong generalization of previously discussed stable matching problems, it can still be solved in a similar fashion. The recursive algorithm successfully provides a stable solution if there is one, and signals if there isn't one.
-
-**[TODO 4: Add future work regarding weak preferences and fractional/additively separable hedonic games.]**
-
-```
+### Nice-to-have
+7. **Existence characterization** — analogue of Tan's condition for groupings.
+8. **Weak preferences extension** — at least a formal conjecture about what changes.
