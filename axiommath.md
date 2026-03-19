@@ -138,3 +138,56 @@ This is Phase 2 work — it directly addresses the paper's critical bottleneck.
 - Does AXLE require Lean 4 or Lean 4 + Mathlib? The considerable condition and Finset reasoning will likely need Mathlib.
 - API authentication: check https://axle.axiommath.ai/v1/docs/ for key requirements before starting.
 - Is `disprove` bounded by timeout? For lemmas of this complexity, may need to set limits.
+
+---
+
+## Working Checklist
+
+### Setup
+- [ ] Install Lean 4 (`elan` toolchain manager)
+- [ ] Create `lean/lakefile.lean` with Mathlib dependency
+- [ ] Run `lake update` and confirm Mathlib builds
+- [ ] Install AXLE SDK: `uv pip install axiom-axle` (use `/mnt/data/pytools` env)
+- [ ] Check API key requirements at https://axle.axiommath.ai/v1/docs/
+- [ ] Run a smoke-test `axle check` on a trivial Lean snippet to confirm end-to-end connectivity
+
+### Defs.lean
+- [ ] Define `Agent`, `Group` (as `Finset Agent`), `PreferenceProfile`
+- [ ] Define `Considerable`: group G is considerable for α iff every other member of G lists G currently
+- [ ] Define `CoreStable`: no subset of agents all prefer some coalition to their current assignment
+- [ ] Define `SimplifiedReduction`: one step of the algorithm (prefer + considerable → assign)
+- [ ] Run `axle check lean/Defs.lean` — fix all errors before proceeding
+
+### Lemma 1 — GS Unification
+- [ ] Write `lean/Lemma1.lean`: import Defs, state lemma with `sorry` body
+  - Statement: bipartite + size-2 constraint → considerable on {α_i, α_j} ↔ α_j holds α_i → reduction step ≡ GS deferred-acceptance step
+- [ ] Run `axle check lean/Lemma1.lean` to confirm statement typechecks
+- [ ] Run `axle sorry2lemma lean/Lemma1.lean` — record extracted subgoals
+- [ ] Subgoal: prove `considerable` on size-2 bipartite pair ↔ "holds" relation
+- [ ] Subgoal: prove reduction step on such a pair ↔ GS proposal/hold step
+- [ ] Subgoal: prove termination correspondence (both terminate in same round)
+- [ ] Run `axle verify_proof` on each subgoal after filling it in
+- [ ] If a proof is close but broken, run `axle repair_proofs` before rewriting
+- [ ] Run `axle disprove lean/Lemma1.lean` — if counterexample found, revise claim
+- [ ] Run `axle simplify_theorems lean/Lemma1.lean`
+- [ ] Run `axle extract_theorems lean/Lemma1.lean` — clean dependency-tracked output
+
+### Lemma 2 — Irving Unification
+- [ ] Write `lean/Lemma2.lean`: import Defs, state lemma with `sorry` body
+  - Statement: size-2 non-bipartite → move-on chain of length k forms a cycle ≡ Irving rotation; elimination step ≡ rotation elimination
+- [ ] Run `axle check lean/Lemma2.lean`
+- [ ] Run `axle sorry2lemma lean/Lemma2.lean` — record extracted subgoals
+- [ ] Subgoal: prove move-on chain of length k forms a cycle
+- [ ] Subgoal: prove cycle structure matches Irving rotation definition
+- [ ] Subgoal: prove elimination actions are identical
+- [ ] Run `axle verify_proof` on each subgoal
+- [ ] Run `axle repair_proofs` where needed
+- [ ] Run `axle disprove lean/Lemma2.lean`
+- [ ] Run `axle simplify_theorems` + `axle extract_theorems`
+
+### Paper Integration
+- [ ] Add remark after Lemma 1: proof machine-verified in Lean 4 via AXLE
+- [ ] Add remark after Lemma 2: same
+- [ ] Publish Lean files as supplementary artifact (GitHub repo or appendix)
+- [ ] Reference the formalization artifact in abstract or related work section
+- [ ] Re-render paper with `tectonic` and check proofs read correctly in context
