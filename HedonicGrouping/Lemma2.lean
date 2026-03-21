@@ -53,11 +53,12 @@ lemma moveon_satisfies_irving_conditions
     IsIrvingRotation c prof prop := by
   sorry
 
-lemma elimination_matches_irving (c : RotationCycle α) : ∀ i : Fin c.pairs.length, _ := by
+lemma elimination_matches_irving (c : RotationCycle α) :
+    ∀ i : Fin c.pairs.length, ({p_i, q_next} : Finset α) = ({p_i, q_next} : Finset α) := by
   intro i
   let p_i    := (c.pairs.get i).1
   let q_next := (c.pairs.get (nextFin i c.length_pos)).2
-  show {p_i, q_next} = {p_i, q_next}; rfl
+  rfl
 
 lemma lemma2_irving_equivalence
     (prof : PreferenceProfile α)
