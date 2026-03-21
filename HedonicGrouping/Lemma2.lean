@@ -5,14 +5,12 @@ open HedonicGrouping.Defs
 
 variable {α : Type*} [DecidableEq α] [Fintype α]
 
-def SizeTwo (prof : PreferenceProfile α) : Prop :=
-  ∀ a : α, ∀ G ∈ prof a, G.card = 2
-
 structure RotationCycle (α : Type*) where
   pairs       : List (α × α)
   nonempty    : pairs ≠ []
   length_ge_2 : 2 ≤ pairs.length
 
+omit [DecidableEq α] [Fintype α] in
 lemma RotationCycle.length_pos (c : RotationCycle α) : 0 < c.pairs.length :=
   Nat.lt_of_lt_of_le (by norm_num) c.length_ge_2
 
@@ -41,6 +39,7 @@ def IsMoveOnChain (c : RotationCycle α) (prop : α → Option (Finset α)) : Pr
   let q_0 := (c.pairs.get ⟨0, c.length_pos⟩).2
   Considerable {p_0, q_0} p_0 prop
 
+omit [DecidableEq α] [Fintype α] in
 lemma moveon_cycle_is_irving_rotation
     (chain : RotationCycle α) : ∃ rot : RotationCycle α, rot = chain := ⟨chain, rfl⟩
 
@@ -53,12 +52,8 @@ lemma moveon_satisfies_irving_conditions
     IsIrvingRotation c prof prop := by
   sorry
 
-lemma elimination_matches_irving (c : RotationCycle α) :
-    ∀ i : Fin c.pairs.length, ({p_i, q_next} : Finset α) = ({p_i, q_next} : Finset α) := by
-  intro i
-  let p_i    := (c.pairs.get i).1
-  let q_next := (c.pairs.get (nextFin i c.length_pos)).2
-  rfl
+def RotationCycle.eliminatedPair (c : RotationCycle α) (i : Fin c.pairs.length) : Finset α :=
+  {(c.pairs.get i).1, (c.pairs.get (nextFin i c.length_pos)).2}
 
 lemma lemma2_irving_equivalence
     (prof : PreferenceProfile α)

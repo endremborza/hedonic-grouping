@@ -11,12 +11,10 @@ structure BipartiteStructure (α : Type*) where
 def BipartiteStructure.isWomen (bp : BipartiteStructure α) (a : α) : Bool :=
   !bp.isMen a
 
-def SizeTwo (prof : PreferenceProfile α) : Prop :=
-  ∀ a : α, ∀ G ∈ prof a, G.card = 2
-
 def BipartitePref (bp : BipartiteStructure α) (prof : PreferenceProfile α) : Prop :=
   ∀ a : α, ∀ G ∈ prof a, ∀ b ∈ G, ∀ c ∈ G, b ≠ c → bp.isMen b ≠ bp.isMen c
 
+omit [Fintype α] in
 lemma considerable_iff_mutual_proposal
     (a b : α) (hab : a ≠ b)
     (G : Finset α) (hG : G = {a, b})
@@ -40,6 +38,7 @@ lemma considerable_iff_mutual_proposal
 def GSHolds (prop : α → Option (Finset α)) (a b : α) : Prop :=
   prop b = some {a, b}
 
+omit [Fintype α] in
 lemma considerable_eq_gsHolds
     (a b : α) (hab : a ≠ b)
     (prop : α → Option (Finset α)) :
@@ -47,14 +46,15 @@ lemma considerable_eq_gsHolds
   unfold GSHolds
   exact considerable_iff_mutual_proposal a b hab {a, b} rfl prop
 
+omit [Fintype α] in
 lemma lemma1_considerable_matches_gs
-    (bp : BipartiteStructure α)
+    (_bp : BipartiteStructure α)
     (prof : PreferenceProfile α)
-    (hsize : SizeTwo prof)
-    (hbip : BipartitePref bp prof)
+    (_hsize : SizeTwo prof)
+    (_hbip : BipartitePref _bp prof)
     (prop : α → Option (Finset α))
     (a b : α) (hab : a ≠ b)
-    (haMen : bp.isMen a = true)
-    (hbWomen : bp.isMen b = false) :
+    (_haMen : _bp.isMen a = true)
+    (_hbWomen : _bp.isMen b = false) :
     Considerable {a, b} a prop ↔ GSHolds prop a b := by
   exact considerable_eq_gsHolds a b hab prop

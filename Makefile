@@ -15,7 +15,7 @@
 
 export PATH := $(HOME)/.elan/bin:$(PATH)
 
-LEAN_DIR := lean
+LEAN_DIR := HedonicGrouping
 ENV      := lean-4.28.0
 AXLE     := axle
 TIMEOUT  := 120

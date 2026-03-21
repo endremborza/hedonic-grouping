@@ -111,4 +111,11 @@ This will later be expanded to require:
 def IsValidGrouping (μ : Grouping α) : Prop :=
   ∀ a : α, a ∈ μ a
 
+/--
+`SizeTwo prof` means every coalition in every agent's preference list has exactly
+two members — the setting for classical matching problems.
+-/
+def SizeTwo (prof : PreferenceProfile α) : Prop :=
+  ∀ a : α, ∀ G ∈ prof a, G.card = 2
+
 end HedonicGrouping.Defs
