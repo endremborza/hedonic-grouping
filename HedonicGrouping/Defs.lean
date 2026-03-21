@@ -1,5 +1,6 @@
 import Mathlib
 
+namespace HedonicGrouping.Defs
 /-!
 # Hedonic Grouping — Core Definitions
 
@@ -109,3 +110,5 @@ This will later be expanded to require:
 -/
 def IsValidGrouping (μ : Grouping α) : Prop :=
   ∀ a : α, a ∈ μ a
+
+end HedonicGrouping.Defs
