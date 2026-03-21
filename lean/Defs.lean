@@ -3,38 +3,59 @@ import Mathlib
 /-!
 # Hedonic Grouping — Core Definitions
 
-Formalizes the grouping problem: agents, preference profiles, the "considerable"
-condition, core stability, and one step of the Simplified Reduction algorithm.
+This file introduces the basic objects used throughout the formalization:
+agents, preference profiles, coalition comparison, proposal states, blocking
+coalitions, and core stability.
+
+The definitions here are intentionally lightweight. In particular:
+- a preference profile is represented by an ordered list of candidate groups,
+- a grouping is represented as a map from each agent to its assigned group,
+- additional well-formedness conditions can be introduced separately later.
 -/
+
 variable {α : Type*} [DecidableEq α] [Fintype α]
 
--- A preference profile for agent `a`: a strict linear order on Finset α \ {a}.
--- We represent it as a list of groups in decreasing preference order.
--- `prefs a` is the ordered list of groups that `a` could belong to (excluding `a` itself).
+/-- A preference profile assigns to each agent a list of candidate groups,
+ordered from most preferred to least preferred. -/
 def PreferenceProfile (α : Type*) := α → List (Finset α)
 
--- `ranks prof a G H` means agent `a` strictly prefers group `G` to group `H`
--- (i.e., `G` appears before `H` in `prof a`).
-def ranks (prof : PreferenceProfile α) (a : α) (G H : Finset α) : Prop :=
+/--
+`Ranks prof a G H` means that agent `a` strictly prefers group `G` to group `H`.
+
+This is encoded by saying that `G` appears earlier than `H` in the preference list
+`prof a`.
+-/
+def Ranks (prof : PreferenceProfile α) (a : α) (G H : Finset α) : Prop :=
   ∃ i j : Fin (prof a).length, i < j ∧ (prof a)[i] = G ∧ (prof a)[j] = H
 
--- A grouping (partition) is represented as a function assigning each agent to their group.
--- We use `Finset α` as the group type; a valid partition requires disjointness + coverage,
--- but for stability we only need the assignment function.
+/--
+A grouping assigns to each agent the group they belong to.
+
+This is only the raw assignment map. It does not yet enforce that the groups form
+a genuine partition. Those conditions should be packaged separately.
+-/
 def Grouping (α : Type*) := α → Finset α
 
--- `Considerable`: group `G` is considerable for agent `a` under proposal map `prop`
--- iff every other member of `G` is currently proposing `G`.
--- `prop b` = the group that agent `b` is currently proposing (None if not proposing).
+/--
+`Considerable G a prop` means that, under the current proposal map `prop`,
+every member of `G` other than `a` is currently proposing `G`.
+
+This is the basic "mutual support" condition used by the reduction algorithm.
+-/
 def Considerable (G : Finset α) (a : α) (prop : α → Option (Finset α)) : Prop :=
   ∀ b ∈ G, b ≠ a → prop b = some G
 
--- `BlockingCoalition`: a set `S` blocks grouping `μ` under preference profile `prof`
--- iff every member of `S` strictly prefers `S` (minus themselves) to their current group.
-def BlockingCoalition (prof : PreferenceProfile α) (μ : Grouping α) (S : Finset α) : Prop :=
-  S.card ≥ 2 ∧
-  ∀ a ∈ S, ranks prof a (S.erase a) (μ a)
+/--
+`BlockingCoalition prof μ S` means that the coalition `S` blocks grouping `μ`.
 
--- `CoreStable`: a grouping is core-stable iff no blocking coalition exists.
+The coalition must have at least two members, and every member must strictly prefer
+the coalition obtained by removing themselves from `S` to their current assigned group.
+-/
+def BlockingCoalition (prof : PreferenceProfile α) (μ : Grouping α) (S : Finset α) : Prop :=
+  S.card ≥ 2 ∧ ∀ a ∈ S, Ranks prof a (S.erase a) (μ a)
+
+/--
+A grouping is core-stable if no blocking coalition exists.
+-/
 def CoreStable (prof : PreferenceProfile α) (μ : Grouping α) : Prop :=
   ∀ S : Finset α, ¬ BlockingCoalition prof μ S
