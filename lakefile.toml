@@ -1,0 +1,14 @@
+name = "hedonic-grouping"
+version = "0.1.0"
+defaultTargets = ["hedonic-grouping"]
+
+[[lean_lib]]
+name = "HedonicGrouping"
+
+[[lean_exe]]
+name = "hedonic-grouping"
+root = "Main"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"

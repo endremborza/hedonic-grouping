@@ -1,6 +1,6 @@
 # Publication Plan
 
-## Status: Phase 2 partially complete
+## Status: Phase 2 substantially complete
 
 ### Phase 1: Literature & Terminology — DONE
 - [x] Related Work section added connecting to hedonic games / core stability literature
@@ -10,12 +10,54 @@
 - [x] Bibliography command fixed (was broken)
 - [ ] Body text still uses "grouping problem" / "group stability" — intentional, but consider adding explicit parenthetical "(core stability)" at key points in Sections 3-4
 
-### Phase 2: Unifying Framework Proofs — IN PROGRESS
+### Phase 2: Unifying Framework Proofs — SUBSTANTIALLY COMPLETE
+
+#### Paper-level proofs (tex/main.tex)
 - [x] Section 5 "Connections to Classical Matching Algorithms" added
 - [x] Lemma 1 (→ Gale-Shapley) with proof sketch
 - [x] Lemma 2 (→ Irving) with proof sketch
-- [ ] **Tighten Lemma 1**: the "considerable" condition under bipartite size-2 must be unpacked more carefully. Currently claims α_j proposes {α_i} makes it considerable — but considerable means all other members propose it, which for a pair means the *other* agent proposes it. Under bipartite GS, the proposer side always proposes first, so the responder never proposes — the "considerable" condition is satisfied when the responder holds exactly one proposal (the best so far). This subtlety needs explicit treatment.
-- [ ] **Tighten Lemma 2**: show the cycle structure. When α_1 moves on from α_2, and α_2 moves on from α_3, ... , and α_k moves on from α_1, a rotation is detected. Map this explicitly to Irving's rotation (q_0, q_1, ..., q_{r-1}) and show the eliminations are identical.
+- [ ] **Tighten Lemma 1 proof text**: unpack the "considerable" condition more carefully.
+  Under bipartite GS, the proposer side always proposes first; the responder holds
+  the best proposal received. The considerable condition on {α_i, α_j} under size-2
+  reduces to: α_j holds α_i's proposal (= α_j's current best). This subtlety is now
+  machine-verified in lean/Lemma1.lean but needs explicit prose treatment in the paper.
+- [ ] **Tighten Lemma 2 proof text**: make the cycle structure explicit. When α_1 moves
+  on from α_2, α_2 from α_3, ..., α_k from α_1, the `RotationCycle` closes. Map this
+  explicitly to Irving's rotation (q_0, ..., q_{r-1}) and show eliminations are identical.
+  The structural correspondence is machine-verified; the semantic proof is open (see below).
+
+#### Lean 4 formalization (lean/)
+
+All files use AXLE (lean-4.28.0 environment, Mathlib included) for checking.
+
+**lean/Defs.lean** — DONE, no sorrys
+- [x] `PreferenceProfile`, `ranks`, `Considerable`, `BlockingCoalition`, `CoreStable`
+
+**lean/Lemma1.lean** — DONE, fully proved, no sorrys
+- [x] `considerable_iff_mutual_proposal`: on size-2 pair {a,b}, considerable ↔ prop b = some {a,b}
+- [x] `considerable_eq_gsHolds`: considerable condition = GS "holds" relation (definitional)
+- [x] `lemma1_considerable_matches_gs`: main Lemma 1 statement with BipartiteStructure hypotheses
+- [x] `axle disprove` found no counterexample for any claim
+
+**lean/Lemma2.lean** — MOSTLY DONE, one open sorry
+- [x] `RotationCycle α`: unified structure for both Irving rotations and move-on chains.
+  `IrvingRotation` and `MoveOnChain` are both `abbrev`s for `RotationCycle`, making
+  structural correspondence definitional rather than existential.
+- [x] `IsIrvingRotation`: validity predicate (p_i proposes to q_i; q_i's list orders them correctly)
+- [x] `IsMoveOnChain`: algorithmic predicate (p_i moved on from q_i; cycle closes via considerable)
+- [x] `moveon_cycle_is_irving_rotation`: structural correspondence is `⟨chain, rfl⟩` — trivial by design
+- [x] `elimination_matches_irving`: pair {p_i, q_{i+1 mod r}} removed by both, proved by `rfl`
+- [x] `axle disprove` found no counterexample for any claim
+- [ ] **Open sorry**: `moveon_satisfies_irving_conditions` — a cycle from the move-on mechanism
+  satisfies `IsIrvingRotation`. This requires reasoning about the algorithm's execution state
+  (what proposals were made and held, what was eliminated from M). Needs the algorithm semantics
+  formalized (relations between `prop`, the preference lists, and M-reductions).
+
+**Next step to close the sorry**:
+Formalize the algorithm state as a record `AlgState` (current `prop` map + reduced M) and define
+`SimplifiedReduction` as a relation on `AlgState`. Then show that if `AlgState` satisfies
+the loop invariants of Algorithm 2, and the move-on step produces a cycle, the cycle satisfies
+`IsIrvingRotation`. This is ~50–80 lines of Lean.
 
 ### Phase 3: Complexity Analysis — NOT STARTED
 - [ ] Define input size: $N = \sum_{i=1}^{p} |\Omega_i|$ (total preference entries). Under unrestricted preferences, $|\Omega_i| = 2^{p-1} - 1$, so $N = p(2^{p-1} - 1)$.
@@ -44,4 +86,7 @@
 - [ ] Tighten informal passages for CS theory audience
 - [ ] Remove `cusack95` from bib (unrelated — phase-unwrapping optics paper)
 - [ ] Uncomment and update author affiliation
+- [ ] Add remark after Lemma 1: proof machine-verified in Lean 4 via AXLE
+- [ ] Add remark after Lemma 2: structural correspondence machine-verified; semantic proof open
+- [ ] Publish lean/ directory as supplementary artifact
 - [ ] Final compilation check, page count, format compliance for target venue
