@@ -108,4 +108,74 @@ this setting.
 def SizeTwo (prof : PreferenceProfile α) : Prop :=
   ∀ a : α, ∀ G ∈ prof a, G.card = 2
 
+/-! ### Algorithm State and Operations (§4)
+
+The algorithm operates on a mutable state tracking proposals and remaining
+preferences. These definitions connect to `Considerable` (Lemma 1) and
+the reduced preference table (Lemma 2). The complete imperative algorithm
+is implemented in Python (`src/grouping.py`) and pseudocode
+(`tex/algorithms.tex`); the Lean definitions capture the state, operations,
+and cascade dynamics that the formal lemmas reference.
+-/
+
+/-- Algorithm state during execution of the Recursive Grouping (Algorithm 4).
+    - `prefs`: remaining admissible coalitions per agent (shrinks via elimination)
+    - `outProps`: outgoing proposals per agent (grows as agents propose)
+    - `forcedMoves`: coalitions from which agents have been forced to move on -/
+structure AlgState (α : Type*) [DecidableEq α] where
+  prefs       : α → List (Finset α)
+  outProps    : α → List (Finset α)
+  forcedMoves : List (Finset α)
+
+/-- Initialize algorithm state from a preference profile. -/
+def AlgState.init (prof : PreferenceProfile α) : AlgState α where
+  prefs := prof
+  outProps := fun _ => []
+  forcedMoves := []
+
+/-- Proposal map: each agent's currently active outgoing proposal (the most
+    recent one not in `forcedMoves`). Connects `AlgState` to the
+    `Considerable` predicate — `Considerable G a s.propMap` holds when all
+    other members of G are actively proposing G. -/
+noncomputable def AlgState.propMap (s : AlgState α) : α → Option (Finset α) :=
+  fun a => ((s.outProps a).filter (· ∉ s.forcedMoves)).getLast?
+
+/-- Reduced preference table under size-2 restriction: extracts remaining
+    acceptable partners in preference order for each agent. Connects the
+    algorithm state to the rotation analysis in Lemma 2. -/
+noncomputable def AlgState.reducedTable (s : AlgState α) : α → List α :=
+  fun a => (s.prefs a).filterMap fun G =>
+    if G.card = 2 then (G.erase a).toList.head? else none
+
+/-- Eliminate coalitions from the algorithm state. -/
+noncomputable def AlgState.eliminate (s : AlgState α) (cs : List (Finset α)) :
+    AlgState α where
+  prefs := fun a => (s.prefs a).filter (· ∉ cs)
+  outProps := fun a => (s.outProps a).filter (· ∉ cs)
+  forcedMoves := s.forcedMoves
+
+/-- Available coalitions: remaining preferences not yet proposed. -/
+noncomputable def AlgState.available (s : AlgState α) (a : α) :
+    List (Finset α) :=
+  (s.prefs a).filter (· ∉ s.outProps a)
+
+/-- Total remaining preferences — termination measure. Strictly decreases
+    with each elimination, bounding the algorithm's computation. -/
+noncomputable def AlgState.totalPrefs (s : AlgState α) : ℕ :=
+  Finset.univ.sum fun a => (s.prefs a).length
+
+/-- One step of the move-on cascade on reduced preference tables (§4).
+    When agent `p` moves on from `first(p)`, they propose `second(p) = q`.
+    The pair `{p, q}` is immediately considerable for `q` (size-2), so `q`
+    eliminates everything below it — removing `last(q) = p_next`.
+    This is the atomic operation underlying both Irving's Phase 2 rotation
+    elimination and Algorithm 3's forced move-on mechanism. -/
+noncomputable def cascadeStep (reduced : α → List α) (p : α) : α → List α :=
+  let q := ((reduced p)[1]?).getD p
+  let p_next := (reduced q).getLastD q
+  fun a =>
+    if a = q then (reduced a).filter (· ≠ p_next)
+    else if a = p_next then (reduced a).filter (· ≠ q)
+    else reduced a
+
 end HedonicGrouping.Defs

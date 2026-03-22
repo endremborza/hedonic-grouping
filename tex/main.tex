@@ -65,6 +65,7 @@
 \newtheorem{mylem}{Lemma}
 \newtheorem{myprop}{Proposition}
 \usepackage[ruled,vlined]{algorithm2e}
+\input{algorithms}
 
 %STRIKETHROUGH
 \usepackage[normalem]{ulem}
@@ -252,50 +253,8 @@ A proposal is \textbf{considerable} for an agent if all other members in it prop
 \end{mydef}
 
 
-%\begin{myalg}
+\AlgBasicReduction
 
-%\label{alg:red1}
-
-\begin{algorithm}[H]
-   \SetKw{KwSt}{Start}
-   \SetKw{KwOr}{or}
-   \SetKw{KwIn}{in}
-   \SetKw{KwTe}{Halt}
-   \SetKw{KwSk}{skip}
-   \SetKw{KwBr}{break}
-   %\KwSt\;
-   %$M' = M$\;
-   \While{for some $\alpha \in A$ no one holds the proposal of $\alpha$}{
-        \For{$\alpha_i$ \KwIn $A$ $\setminus$ \{agents someone holds a proposal for\} }{
-            %\If{someone holds $\alpha_i$'s proposal}{
-            %   \KwSk\;
-            %}
-            \eIf{$M(\alpha_i) \neq \emptyset$}{
-                $H$ = the agent(s) $\alpha_i$ ranks highest form $M(\alpha_i)$\;
-                $\alpha_i$ proposes to agent(s) in $H$\;
-                \For{$\alpha_j$ in $H$}{
-                    \eIf{$\alpha_j$ holds a considerable proposal he prefers to $\alpha_i$'s}{
-                        $\alpha_j$ rejects $\alpha_i$'s proposal\;
-                        $M$ gets reduced to matchings where $H \cup \{\alpha_i\}$ can not form\;
-                        \KwBr
-                    }{
-                        $\alpha_j$ holds $\alpha_i$'s proposal\;
-                        \If{$\alpha_j$ can consider $\alpha_i$'s proposal}{
-                            $\alpha_j$ rejects all other proposals he prefers $H$ to\;
-                        }
-                    }
-                }
-            }{
-                \KwTe\;
-            }
-        }
-    }
-    \caption{Basic Reduction\label{alg:bas}}
-    %\KwTe\;
-\end{algorithm}
-    
-
-%\end{myalg}
 Using this algorithm, Example \ref{ex:g5} turns out as follows
 
 \begin{itemize}
@@ -327,32 +286,7 @@ If agent $\alpha$ holds a considerable proposal for group $F$, no group can form
 
 Using Corollary \ref{sta:hold} the algorithm can be updated and simplified, so that rejections never occur at the time of proposal. This can be achieved by instantly reducing $M$ as any agent $\alpha$ receives a considerable proposal. All possible groupings from $M$ that allow groups to form which $\alpha$ desires less than the \textbf{considerable} proposal he just received, are eliminate.
 
-\begin{algorithm}[H]
-   \SetKw{KwSt}{Start}
-   \SetKw{KwOr}{or}
-   \SetKw{KwIn}{in}
-   \SetKw{KwTe}{Halt}
-   \SetKw{KwSk}{skip}
-   \SetKw{KwBr}{break}
-   \While{for some $\alpha \in A$ no one holds the proposal of $\alpha$}{
-        \For{$\alpha_i$ \KwIn $A$ $\setminus$ \{agents someone holds a proposal for\} }{
-            \eIf{$M(\alpha_i) \neq \emptyset$}{
-                $H$ = the agent(s) $\alpha_i$ ranks highest form $M(\alpha_i)$\;
-                $\alpha_i$ proposes to agent(s) in $H$\;
-                \For{$\alpha_j$ in $H$}{
-                    $\alpha_j$ holds $\alpha_i$'s proposal\;
-                    \If{$\alpha_j$ is allowed to consider $\alpha_i$'s proposal}{
-                        $M$ gets reduced to matchings where groups $\alpha_j$ desires less than $H$ can not form\;
-                    }
-                }
-            }{
-                \KwTe\;
-            }
-        }
-    }
-    \caption{Simplified Reduction\label{alg:sim}}
-    %\KwTe\;
-\end{algorithm}
+\AlgSimplifiedReduction
 
 Going back to Example \ref{ex:g5}, the only difference in the steps from Basic Reduction is $\alpha_5$ does not propose to $\alpha_4$. The possibility of $\{ \alpha_4, \alpha_5 \}$ was discarded, when $\alpha_4$ received a considerable proposal from $\alpha_1$.
 
@@ -370,40 +304,7 @@ We formalize Algorithm~\ref{alg:fun} as a function. Its inputs are a grouping pr
 
 At the beginning of the function some agents \textbf{move on}. This means that for all agents $\alpha_i$ who have a proposal held by $J \setminus \alpha_i$,  $J \setminus \alpha_i$ get removed from $M(\alpha_i)$, so that they don't propose it again. However, since they prefer that to anything else they will propose later, if they get proposals for it from all other agents in the group who weren't forced to move on, they can consider it.\footnote{Note that this only matters if more than one agent moved on}
 
-\begin{algorithm}[H]
-   \SetKwProg{Fn}{Function}{\string:}{}
-   \SetKw{KwSt}{Start}
-   \SetKw{KwOr}{or}
-   \SetKw{KwIn}{in}
-   \SetKw{KwTe}{Halt}
-   \SetKw{KwSk}{skip}
-   \SetKw{KwRe}{Return}
-    \Fn{process($A$,$M$,$\Omega$,$J$)}{
-        all agents who most prefer to be in $J$ move on\;
-        \While{for some $\alpha \in A$ no one holds the proposal of $\alpha$}{
-            \For{$\alpha_i$ \KwIn $A$ $\setminus$ \{agents someone holds a proposal for\} }{
-                \eIf{$M(\alpha_i) \neq \emptyset$}{
-                    $H$ = the agent(s) $\alpha_i$ ranks highest form $M(\alpha_i)$\;
-                    $\alpha_i$ proposes to agent(s) in $H$\;
-                    \For{$\alpha_j$ in $H$}{
-                        $\alpha_j$ holds $\alpha_i$'s proposal\;
-                        \If{$\alpha_j$ is allowed to consider $\alpha_i$'s proposal}{
-                            \If{$H \cup \alpha_i = J$}{
-                                \KwRe 1\;
-                            }
-                            $M$ gets reduced to matchings where groups $\alpha_j$ desires less than $H$ can not form\;
-                        }
-                    }
-                }{
-                    \KwRe 0\;
-                }
-            }
-        }
-        \KwRe $M$ \;
-    }
-    \caption{Processing Function\label{alg:fun}}
-    %\KwTe\;
-\end{algorithm}
+\AlgProcessing
 
 See that the function can either return with a further reduced problem, a $1$ or a $0$. The $0$ value is the one where one agent runs out of groups to propose to. This obviously means no stable grouping is possible, if agents move on from $J$. As discussed above, return value $1$ is new, and has implications regarding possible stable solutions. The return value $1$ means that someone who was forced to move on from $J$, received $J$ as a considerable proposal. An important statement can be deduced from this.
 
@@ -454,52 +355,7 @@ One seemingly problematic aspect of the function returning with $M$ is that furt
 Agents need to systematically attempt to move on within the function, until they only have one option left, or one of them runs out. An important element of this process, is that all agents are required to have a proposal held before some are forced to move on. This algorithm is defined precisely as follows.
 
 
-\begin{algorithm}[H]
-   \SetKwProg{Fn}{Function}{\string:}{}
-   \SetKw{KwSt}{Start}
-   \SetKw{KwOr}{or}
-   \SetKw{KwIn}{in}
-   \SetKw{KwTe}{Halt}
-   \SetKw{KwSk}{skip}
-   \SetKw{KwBr}{break}
-   \SetKw{KwRe}{Return}
-    \Fn{grouping($A$,$M$,$\Omega$,$J$)}{
-        all agents who most prefer to be in $J$ move on\;
-        \While{some $\alpha \in A$ has a group left to propose to}{
-            \While{\{agents someone holds a proposal for\} $\neq$ $A$}{
-                \For{$\alpha_i$ \KwIn $A$ $\setminus$ \{agents someone holds a proposal for\} }{
-                    \eIf{$M(\alpha_i) \neq \emptyset$}{
-                        $H$ = the agent(s) $\alpha_i$ ranks highest form $M(\alpha_i)$\;
-                        $\alpha_i$ proposes to agent(s) in $H$\;
-                        \For{$\alpha_j$ in $H$}{
-                            $\alpha_j$ holds $\alpha_i$'s proposal\;
-                            \If{$\alpha_j$ is allowed to consider $\alpha_i$'s proposal}{
-                                $M$ gets reduced to matchings where groups $\alpha_j$ desires less than $H$ can not form\;
-                            }
-                        }
-                    }{
-                        \KwRe 0\;
-                    }
-                }
-            }
-            \For{$\alpha_i$ \KwIn $A$ }{
-                \If{$\alpha_i$ has a group left to propose to}{
-                    $K$ = $\alpha_i$'s 1st preference of the groups left to propose to\;
-                    \eIf{grouping($A$,$M$,$\Omega$,$K$) = 0}
-                    {
-                        $M$ gets reduced to matchings where groups $\alpha_i$ desires less than $K$ can not form\;
-                    }{
-                        $M$ = grouping($A$,$M$,$\Omega$,$K$)
-                    }
-                    \KwBr\;
-                }
-            }
-        }
-        \KwRe $M$\;
-    }
-    \caption{Recursive Grouping Function \label{alg:rec}}
-    %\KwTe\;
-\end{algorithm}
+\AlgGrouping
 
 Following Corollary \ref{sta:rej} and Corollary \ref{sta:hold}, while looking at Corollary \ref{sta:ret1} in the current context, the second part of the algorithm sufficiently determines whether an agent can move on from their current outgoing proposal, and still possibly find a stable grouping. If it is not possible, \textit{$M$ gets reduced to matchings where groups $\alpha_i$ desires less than $K$ can not form} so the algorithm continues and disregards all possible groupings where groups are allowed which could form after $\alpha_i$ has moved on. Note that this does not necessarily mean that the last group $\alpha_i$ moved on from needs to form, since he might have been forced to move on multiple times. It merely means that the latest try doesn't lead to stable solutions.
 

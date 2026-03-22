@@ -6,6 +6,14 @@ Lean 4 formalization of a unifying algorithm for stable matching as hedonic coal
 
 A single recursive algorithm subsumes both Gale-Shapley (bipartite matching) and Irving (stable roommates) as special cases, applied to general hedonic games with strict preferences over arbitrary coalitions. The algorithm is correct and complete but worst-case exponential — inherent since the general problem is NP-hard (Ballester 2004). It reduces to polynomial-time on tractable subclasses.
 
+## Algorithm Representations
+
+The core algorithm is defined in three parallel representations:
+
+- **Pseudocode** (`tex/algorithms.tex`): LaTeX commands (`\AlgSimplifiedReduction`, `\AlgProcessing`, `\AlgGrouping`) imported by `tex/main.tex`.
+- **Lean 4** (`HedonicGrouping/Defs.lean`): `AlgState`, `propMap`, `reducedTable`, `cascadeStep` — the formal backbone that lemmas reference.
+- **Python** (`src/grouping.py`): Reference implementation with stability verification and random instance generation. Run with `python src/grouping.py`.
+
 ## Paper Structure
 
 The accompanying paper (`tex/main.tex`) introduces a framework `<A, Omega, M>` for hedonic coalition formation:
@@ -19,7 +27,7 @@ The accompanying paper (`tex/main.tex`) introduces a framework `<A, Omega, M>` f
 
 ### Defs.lean — Complete
 
-`PreferenceProfile`, `Considerable`, `BlockingCoalition`, `CoreStable`, `SizeTwo`, validity predicates. Maps directly to the paper's `<A, Omega, M>` framework.
+`PreferenceProfile`, `Considerable`, `BlockingCoalition`, `CoreStable`, `SizeTwo`, validity predicates. Maps directly to the paper's `<A, Omega, M>` framework. Also defines `AlgState` (algorithm state), `propMap` (connects to `Considerable`), `reducedTable` (connects to Lemma 2 rotations), `cascadeStep` (one step of the move-on cascade).
 
 ### Lemma1.lean — Complete (no sorries)
 
@@ -127,7 +135,7 @@ Requires Lean 4 + Mathlib. Toolchain managed by `elan`.
 
 ### For full paper
 - Complexity analysis: formal Big-O treatment, honest framing of exponential worst-case
-- Python 3 implementation + Monte Carlo experiments (p = 5-20)
+- Monte Carlo experiments at larger scale (n = 10-20)
 - Formal theorem numbering with proof environments
 - Language polish
 

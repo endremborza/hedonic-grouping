@@ -1,0 +1,137 @@
+% algorithms.tex — Pseudocode for the Hedonic Grouping Algorithm
+%
+% Import in preamble (after algorithm2e): \input{algorithms}
+% Commands: \AlgBasicReduction, \AlgSimplifiedReduction, \AlgProcessing, \AlgGrouping
+
+% --- Shared keywords ---
+\SetKw{KwSt}{Start}
+\SetKw{KwOr}{or}
+\SetKw{KwIn}{in}
+\SetKw{KwTe}{Halt}
+\SetKw{KwSk}{skip}
+\SetKw{KwBr}{break}
+\SetKw{KwRe}{Return}
+\SetKwProg{Fn}{Function}{\string:}{}
+
+% --- Algorithm 1: Basic Reduction ---
+\newcommand{\AlgBasicReduction}{%
+\begin{algorithm}[H]
+   \While{for some $\alpha \in A$ no one holds the proposal of $\alpha$}{
+        \For{$\alpha_i$ \KwIn $A$ $\setminus$ \{agents someone holds a proposal for\} }{
+            \eIf{$M(\alpha_i) \neq \emptyset$}{
+                $H$ = the agent(s) $\alpha_i$ ranks highest from $M(\alpha_i)$\;
+                $\alpha_i$ proposes to agent(s) in $H$\;
+                \For{$\alpha_j$ in $H$}{
+                    \eIf{$\alpha_j$ holds a considerable proposal he prefers to $\alpha_i$'s}{
+                        $\alpha_j$ rejects $\alpha_i$'s proposal\;
+                        $M$ gets reduced to matchings where $H \cup \{\alpha_i\}$ cannot form\;
+                        \KwBr
+                    }{
+                        $\alpha_j$ holds $\alpha_i$'s proposal\;
+                        \If{$\alpha_j$ can consider $\alpha_i$'s proposal}{
+                            $\alpha_j$ rejects all other proposals he prefers $H$ to\;
+                        }
+                    }
+                }
+            }{
+                \KwTe\;
+            }
+        }
+    }
+    \caption{Basic Reduction\label{alg:bas}}
+\end{algorithm}%
+}
+
+% --- Algorithm 2: Simplified Reduction ---
+\newcommand{\AlgSimplifiedReduction}{%
+\begin{algorithm}[H]
+   \While{for some $\alpha \in A$ no one holds the proposal of $\alpha$}{
+        \For{$\alpha_i$ \KwIn $A$ $\setminus$ \{agents someone holds a proposal for\} }{
+            \eIf{$M(\alpha_i) \neq \emptyset$}{
+                $H$ = the agent(s) $\alpha_i$ ranks highest from $M(\alpha_i)$\;
+                $\alpha_i$ proposes to agent(s) in $H$\;
+                \For{$\alpha_j$ in $H$}{
+                    $\alpha_j$ holds $\alpha_i$'s proposal\;
+                    \If{$\alpha_j$ is allowed to consider $\alpha_i$'s proposal}{
+                        $M$ gets reduced to matchings where groups $\alpha_j$ desires less than $H$ cannot form\;
+                    }
+                }
+            }{
+                \KwTe\;
+            }
+        }
+    }
+    \caption{Simplified Reduction\label{alg:sim}}
+\end{algorithm}%
+}
+
+% --- Algorithm 3: Processing Function ---
+\newcommand{\AlgProcessing}{%
+\begin{algorithm}[H]
+    \Fn{process($A$,$M$,$\Omega$,$J$)}{
+        all agents who most prefer to be in $J$ move on\;
+        \While{for some $\alpha \in A$ no one holds the proposal of $\alpha$}{
+            \For{$\alpha_i$ \KwIn $A$ $\setminus$ \{agents someone holds a proposal for\} }{
+                \eIf{$M(\alpha_i) \neq \emptyset$}{
+                    $H$ = the agent(s) $\alpha_i$ ranks highest from $M(\alpha_i)$\;
+                    $\alpha_i$ proposes to agent(s) in $H$\;
+                    \For{$\alpha_j$ in $H$}{
+                        $\alpha_j$ holds $\alpha_i$'s proposal\;
+                        \If{$\alpha_j$ is allowed to consider $\alpha_i$'s proposal}{
+                            \If{$H \cup \alpha_i = J$}{
+                                \KwRe 1\;
+                            }
+                            $M$ gets reduced to matchings where groups $\alpha_j$ desires less than $H$ cannot form\;
+                        }
+                    }
+                }{
+                    \KwRe 0\;
+                }
+            }
+        }
+        \KwRe $M$ \;
+    }
+    \caption{Processing Function\label{alg:fun}}
+\end{algorithm}%
+}
+
+% --- Algorithm 4: Recursive Grouping ---
+\newcommand{\AlgGrouping}{%
+\begin{algorithm}[H]
+    \Fn{grouping($A$,$M$,$\Omega$,$J$)}{
+        all agents who most prefer to be in $J$ move on\;
+        \While{some $\alpha \in A$ has a group left to propose to}{
+            \While{\{agents someone holds a proposal for\} $\neq$ $A$}{
+                \For{$\alpha_i$ \KwIn $A$ $\setminus$ \{agents someone holds a proposal for\} }{
+                    \eIf{$M(\alpha_i) \neq \emptyset$}{
+                        $H$ = the agent(s) $\alpha_i$ ranks highest from $M(\alpha_i)$\;
+                        $\alpha_i$ proposes to agent(s) in $H$\;
+                        \For{$\alpha_j$ in $H$}{
+                            $\alpha_j$ holds $\alpha_i$'s proposal\;
+                            \If{$\alpha_j$ is allowed to consider $\alpha_i$'s proposal}{
+                                $M$ gets reduced to matchings where groups $\alpha_j$ desires less than $H$ cannot form\;
+                            }
+                        }
+                    }{
+                        \KwRe 0\;
+                    }
+                }
+            }
+            \For{$\alpha_i$ \KwIn $A$ }{
+                \If{$\alpha_i$ has a group left to propose to}{
+                    $K$ = $\alpha_i$'s 1st preference of the groups left to propose to\;
+                    \eIf{grouping($A$,$M$,$\Omega$,$K$) = 0}
+                    {
+                        $M$ gets reduced to matchings where groups $\alpha_i$ desires less than $K$ cannot form\;
+                    }{
+                        $M$ = grouping($A$,$M$,$\Omega$,$K$)
+                    }
+                    \KwBr\;
+                }
+            }
+        }
+        \KwRe $M$\;
+    }
+    \caption{Recursive Grouping Function \label{alg:rec}}
+\end{algorithm}%
+}
