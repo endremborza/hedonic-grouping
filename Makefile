@@ -100,8 +100,8 @@ sorry2lemma:
 # Attempt to automatically repair broken or incomplete proofs.
 # Tries terminal tactics (default: grind) to close open goals.
 # Outputs the repaired Lean source; redirect to file to apply:
-#   make repair FILE=lean/Lemma2.lean > lean/Lemma2_repaired.lean
-# Target specific theorems: make repair NAMES=moveon_satisfies_irving_conditions
+#   make repair FILE=HedonicGrouping/Lemma2.lean > Lemma2_repaired.lean
+# Target specific theorems: make repair NAMES=rotation_eliminates_less_preferred
 
 repair:
 	@echo "==> Attempting proof repair on $(FILE)"
@@ -113,7 +113,7 @@ repair:
 # ── simplify ──────────────────────────────────────────────────────────────────
 # Clean up tactic proofs: remove redundant steps, shorten proof blocks.
 # Run this after all sorrys are closed. Outputs the simplified Lean source.
-# Redirect to apply: make simplify-lemma1 > lean/Lemma1_simplified.lean
+# Redirect to apply: make simplify-lemma1 > Lemma1_simplified.lean
 
 simplify: simplify-lemma1 simplify-lemma2
 
@@ -127,7 +127,7 @@ simplify-lemma2:
 
 # ── extract ───────────────────────────────────────────────────────────────────
 # Split each file into per-theorem .lean files with full dependency tracking.
-# Output goes to EXTRACT_DIR (default: lean/extracted/).
+# Output goes to EXTRACT_DIR (default: HedonicGrouping/extracted/).
 # Use this to produce the publishable supplementary artifact.
 
 extract:
@@ -147,39 +147,5 @@ lean-version:
 
 # ── help ──────────────────────────────────────────────────────────────────────
 help:
-	@echo ""
-	@echo "Lean 4 + AXLE formalization — hedonic-grouping"
-	@echo ""
-	@echo "CHECKING"
-	@echo "  make check               type-check Defs + Lemma1 + Lemma2"
-	@echo "  make check-defs          check lean/Defs.lean only"
-	@echo "  make check-lemma1        check lean/Lemma1.lean only"
-	@echo "  make check-lemma2        check lean/Lemma2.lean only"
-	@echo "  make check-strict        same, but exit non-zero on any sorry"
-	@echo ""
-	@echo "STRESS-TESTING"
-	@echo "  make disprove            run disprove on Lemma1 + Lemma2"
-	@echo "  make disprove-lemma1     disprove Lemma1 only"
-	@echo "  make disprove-lemma2     disprove Lemma2 only"
-	@echo "  make disprove TIMEOUT=300  longer timeout for hard goals"
-	@echo ""
-	@echo "PROOF DEVELOPMENT"
-	@echo "  make sorry2lemma         extract open sorrys from lean/Lemma2.lean"
-	@echo "  make sorry2lemma FILE=lean/Lemma2.lean NAMES=foo  target specific theorem"
-	@echo "  make repair              attempt auto-repair on lean/Lemma2.lean"
-	@echo "  make repair FILE=lean/Lemma2.lean NAMES=moveon_satisfies_irving_conditions"
-	@echo ""
-	@echo "FINALIZING"
-	@echo "  make simplify            clean up proofs in Lemma1 + Lemma2"
-	@echo "  make extract             split into per-theorem files → lean/extracted/"
-	@echo "  make extract EXTRACT_DIR=/tmp/artifact  use a different output dir"
-	@echo ""
-	@echo "DIAGNOSTICS"
-	@echo "  make lean-version        show lean, lake, axle versions + available envs"
-	@echo ""
-	@echo "AXLE environment: $(ENV)  (Lean 4.28.0 + Mathlib)"
-	@echo "Lean toolchain:   $(HOME)/.elan/bin"
-	@echo ""
-	@echo "Open sorry: moveon_satisfies_irving_conditions in lean/Lemma2.lean"
-	@echo "  → needs AlgState formalization; see plan.md Phase 2 for details"
-	@echo ""
+	@echo "See README.md for full target documentation and AXLE workflow."
+	@echo "AXLE environment: $(ENV)  |  Toolchain: $(HOME)/.elan/bin"
