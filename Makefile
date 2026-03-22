@@ -24,6 +24,12 @@ DEFS    := $(LEAN_DIR)/Defs.lean
 LEMMA1  := $(LEAN_DIR)/Lemma1.lean
 LEMMA2  := $(LEAN_DIR)/Lemma2.lean
 
+# AXLE only supports `import Mathlib` — files that import Defs must be
+# concatenated with Defs.lean (stripping their local imports) before sending.
+define cat_with_defs
+	(cat $(DEFS); echo; grep -v '^import ' $(1))
+endef
+
 # Default target file for repair/sorry2lemma when FILE is not specified.
 FILE ?= $(LEMMA2)
 
@@ -51,18 +57,18 @@ check-defs:
 
 check-lemma1:
 	@echo "==> Checking $(LEMMA1)"
-	$(AXLE) check --environment $(ENV) - < $(LEMMA1)
+	$(call cat_with_defs,$(LEMMA1)) | $(AXLE) check --environment $(ENV) -
 
 check-lemma2:
 	@echo "==> Checking $(LEMMA2)"
-	$(AXLE) check --environment $(ENV) - < $(LEMMA2)
+	$(call cat_with_defs,$(LEMMA2)) | $(AXLE) check --environment $(ENV) -
 
 # Fail with non-zero exit code if there are any errors (sorrys included).
 check-strict:
 	@echo "==> Strict check: all files"
 	$(AXLE) check --environment $(ENV) --strict - < $(DEFS)
-	$(AXLE) check --environment $(ENV) --strict - < $(LEMMA1)
-	$(AXLE) check --environment $(ENV) --strict - < $(LEMMA2)
+	$(call cat_with_defs,$(LEMMA1)) | $(AXLE) check --environment $(ENV) --strict -
+	$(call cat_with_defs,$(LEMMA2)) | $(AXLE) check --environment $(ENV) --strict -
 
 # ── disprove ──────────────────────────────────────────────────────────────────
 # Attempt to prove the *negation* of every theorem in a file.
@@ -74,11 +80,11 @@ disprove: disprove-lemma1 disprove-lemma2
 
 disprove-lemma1:
 	@echo "==> Disprove: $(LEMMA1)"
-	$(AXLE) disprove --environment $(ENV) --timeout-seconds $(TIMEOUT) - < $(LEMMA1)
+	$(call cat_with_defs,$(LEMMA1)) | $(AXLE) disprove --environment $(ENV) --timeout-seconds $(TIMEOUT) -
 
 disprove-lemma2:
 	@echo "==> Disprove: $(LEMMA2)"
-	$(AXLE) disprove --environment $(ENV) --timeout-seconds $(TIMEOUT) - < $(LEMMA2)
+	$(call cat_with_defs,$(LEMMA2)) | $(AXLE) disprove --environment $(ENV) --timeout-seconds $(TIMEOUT) -
 
 # ── sorry2lemma ───────────────────────────────────────────────────────────────
 # Extract every `sorry` placeholder (and unsolved error goals) into standalone
@@ -91,10 +97,10 @@ NAMES ?=
 
 sorry2lemma:
 	@echo "==> Extracting sorrys from $(FILE)"
-	$(AXLE) sorry2lemma --environment $(ENV) \
+	$(call cat_with_defs,$(FILE)) | $(AXLE) sorry2lemma --environment $(ENV) \
 	    $(if $(NAMES),--names $(NAMES),) \
 	    --reconstruct-callsite \
-	    - < $(FILE)
+	    -
 
 # ── repair ────────────────────────────────────────────────────────────────────
 # Attempt to automatically repair broken or incomplete proofs.
@@ -105,10 +111,10 @@ sorry2lemma:
 
 repair:
 	@echo "==> Attempting proof repair on $(FILE)"
-	$(AXLE) repair-proofs --environment $(ENV) \
+	$(call cat_with_defs,$(FILE)) | $(AXLE) repair-proofs --environment $(ENV) \
 	    $(if $(NAMES),--names $(NAMES),) \
 	    --terminal-tactics grind,simp,omega,decide \
-	    - < $(FILE)
+	    -
 
 # ── simplify ──────────────────────────────────────────────────────────────────
 # Clean up tactic proofs: remove redundant steps, shorten proof blocks.
@@ -119,11 +125,11 @@ simplify: simplify-lemma1 simplify-lemma2
 
 simplify-lemma1:
 	@echo "==> Simplifying proofs in $(LEMMA1)"
-	$(AXLE) simplify-theorems --environment $(ENV) - < $(LEMMA1)
+	$(call cat_with_defs,$(LEMMA1)) | $(AXLE) simplify-theorems --environment $(ENV) -
 
 simplify-lemma2:
 	@echo "==> Simplifying proofs in $(LEMMA2)"
-	$(AXLE) simplify-theorems --environment $(ENV) - < $(LEMMA2)
+	$(call cat_with_defs,$(LEMMA2)) | $(AXLE) simplify-theorems --environment $(ENV) -
 
 # ── extract ───────────────────────────────────────────────────────────────────
 # Split each file into per-theorem .lean files with full dependency tracking.
@@ -132,11 +138,11 @@ simplify-lemma2:
 
 extract:
 	@echo "==> Extracting theorems from $(LEMMA1) → $(EXTRACT_DIR)"
-	$(AXLE) extract-theorems --environment $(ENV) \
-	    --output-dir $(EXTRACT_DIR) --force - < $(LEMMA1)
+	$(call cat_with_defs,$(LEMMA1)) | $(AXLE) extract-theorems --environment $(ENV) \
+	    --output-dir $(EXTRACT_DIR) --force -
 	@echo "==> Extracting theorems from $(LEMMA2) → $(EXTRACT_DIR)"
-	$(AXLE) extract-theorems --environment $(ENV) \
-	    --output-dir $(EXTRACT_DIR) --force - < $(LEMMA2)
+	$(call cat_with_defs,$(LEMMA2)) | $(AXLE) extract-theorems --environment $(ENV) \
+	    --output-dir $(EXTRACT_DIR) --force -
 
 # ── lean-version ──────────────────────────────────────────────────────────────
 lean-version:

@@ -35,15 +35,15 @@ The accompanying paper (`tex/main.tex`) introduces a framework `<A, Omega, M>` f
 - `considerable_eq_gsHolds`: considerable = GS "holds" relation
 - `lemma1_considerable_matches_gs`: main statement with bipartite hypotheses
 
-### Lemma2.lean — Two open sorries
+### Lemma2.lean — Complete (no sorries)
 
 - `RotationCycle`: cycle structure for Irving rotations (pairs of proposer + second-choice partner)
-- `IsRotation`: standard Irving rotation defined on **reduced preference lists** — `q_i = second(p_i)`, `p_{i+1} = last(q_i)`. No proposal map; this is a property of the reduced table alone.
+- `IsRotation`: standard Irving rotation defined on **reduced preference lists** — `q_i = second(p_i)`, `p_{i+1} = last(q_i)`, `p_i ≠ p_{i+1}`. No proposal map; this is a property of the reduced table alone.
 - `eliminatedPair`: pair eliminated at each cycle position (definitionally shared by both algorithms)
 - `eliminateRotation`: applies Irving's rotation elimination to a reduced table
 - `ReducedListCompatible`, `ReducedTableSymmetric`: invariants connecting reduced lists to the full preference profile
-- **Sorry 1**: `rotation_eliminates_less_preferred` — each eliminated partner is strictly less preferred. Proof sketch is documented; requires connecting reduced-list positions to preference-profile rankings.
-- **Sorry 2**: `cascade_produces_irving_elimination` — the hedonic cascade preserves the reduced-table invariants after rotation elimination. This is the main open result.
+- `rotation_eliminates_less_preferred`: at each position, the eliminated partner is strictly less preferred. Uses symmetry to locate `p_i` on `q_i`'s list before `p_{i+1}`, then applies `ReducedListCompatible`.
+- `cascade_produces_irving_elimination`: rotation elimination preserves both reduced-table invariants. Symmetry preservation uses the removal predicate's inherent symmetry (swapping `q_i ↔ p_{i+1}`); compatibility uses `filter_indices_ordered` to show filtering preserves relative index ordering.
 
 ## Proof Strategy for Lemma 2
 
@@ -62,9 +62,7 @@ Key insight: the `first(b) = a iff last(a) = b` duality of the Phase 1 table mea
 
 ### What remains
 
-1. **Close sorry 1** (`rotation_eliminates_less_preferred`): straightforward once `ReducedListCompatible` + `ReducedTableSymmetric` are combined to locate `p_i` on `q_i`'s list before `p_{i+1}`.
-2. **Close sorry 2** (`cascade_produces_irving_elimination`): show `eliminateRotation` preserves symmetry and compatibility. The symmetry preservation is the harder part — it requires showing that removing `{q_i, p_{i+1}}` doesn't break the `b in reduced(a) iff a in reduced(b)` invariant.
-3. **Full algorithmic correspondence**: formalize `AlgState` (reduced preference lists + loop invariants) to show that the hedonic algorithm's `process` function (Algorithm 3) and Irving's Phase 2 produce the same sequence of `eliminateRotation` calls. This is the deepest remaining piece — it's an induction over the iterated reduction process.
+1. **Full algorithmic correspondence**: formalize `AlgState` (reduced preference lists + loop invariants) to show that the hedonic algorithm's `process` function (Algorithm 3) and Irving's Phase 2 produce the same sequence of `eliminateRotation` calls. This is the deepest remaining piece — it's an induction over the iterated reduction process.
 
 ## AXLE Workflow
 
@@ -129,7 +127,6 @@ Requires Lean 4 + Mathlib. Toolchain managed by `elan`.
 ## Remaining Work
 
 ### Critical
-- Close the two sorries in Lemma 2 (see proof strategy above)
 - Full algorithmic correspondence via `AlgState` (iterated reduction induction)
 - Tighten Lemma 1 and 2 proof prose in the paper
 

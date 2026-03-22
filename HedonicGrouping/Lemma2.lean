@@ -43,16 +43,11 @@ removing the last entry from each `qᵢ`'s reduced list.
   conflated the rotation structure with a specific algorithm state.
 - `eliminatedPair`: the pair removed at each cycle position (shared by
   both algorithms, definitionally identical).
-
-## What remains (sorry)
-
-- `rotation_eliminates_less_preferred`: the eliminated partner is strictly
-  less preferred. Needs `ReducedListCompatible` + `ReducedTableSymmetric`
-  to connect reduced-list positions to preference-profile rankings.
-- `cascade_matches_rotation`: the main correspondence — the hedonic
-  algorithm's move-on cascade follows the rotation's second→last chain
-  and produces the same pair eliminations. Requires formalizing the
-  cascade dynamics on reduced lists.
+- `rotation_eliminates_less_preferred`: at each position, the eliminated
+  partner is strictly less preferred (via `ReducedListCompatible` +
+  `ReducedTableSymmetric`).
+- `cascade_produces_irving_elimination`: rotation elimination preserves
+  the reduced-table invariants (symmetry and compatibility).
 -/
 
 variable {α : Type*} [DecidableEq α] [Fintype α]
@@ -93,7 +88,8 @@ def IsRotation (c : RotationCycle α) (reduced : α → List α) : Prop :=
     let q_i := (c.pairs.get i).2
     let p_next := (c.pairs.get (nextFin i c.length_pos)).1
     (reduced p_i)[1]? = some q_i ∧
-    (reduced q_i).getLastD q_i = p_next ∧ (reduced q_i) ≠ []
+    (reduced q_i).getLastD q_i = p_next ∧ (reduced q_i) ≠ [] ∧
+    p_i ≠ p_next
 
 /-- The pair eliminated at cycle position `i`: `{pᵢ, q_{(i+1) mod r}}`.
 
@@ -140,7 +136,28 @@ theorem rotation_eliminates_less_preferred
     Ranks prof (c.pairs.get i).2
       {(c.pairs.get i).2, (c.pairs.get i).1}
       {(c.pairs.get i).2, (c.pairs.get (nextFin i c.length_pos)).1} := by
-  sorry
+  obtain ⟨hsec, hlast, hne, hneq⟩ := hrot i
+  have hq_mem : (c.pairs.get i).2 ∈ reduced (c.pairs.get i).1 :=
+    List.mem_of_getElem? hsec
+  have hp_mem : (c.pairs.get i).1 ∈ reduced (c.pairs.get i).2 :=
+    (hsym _ _).mp hq_mem
+  obtain ⟨j, hj, hj_eq⟩ := List.mem_iff_getElem.mp hp_mem
+  have hlen : 0 < (reduced (c.pairs.get i).2).length := List.length_pos_of_ne_nil hne
+  have hk : (reduced (c.pairs.get i).2).length - 1 < (reduced (c.pairs.get i).2).length := by omega
+  have hk_eq : (reduced (c.pairs.get i).2)[(reduced (c.pairs.get i).2).length - 1] =
+      (c.pairs.get (nextFin i c.length_pos)).1 := by
+    conv_lhs => rw [← List.getLast_eq_getElem hne]
+    rw [← hlast, List.getLastD_eq_getLast?, List.getLast?_eq_some_getLast hne, Option.getD_some]
+  have hjk : j < (reduced (c.pairs.get i).2).length - 1 := by
+    rcases Nat.lt_or_ge j ((reduced (c.pairs.get i).2).length - 1) with h | h
+    · exact h
+    · exfalso
+      have hjeq : j = (reduced (c.pairs.get i).2).length - 1 := by omega
+      exact hneq (by rw [← hj_eq, ← hk_eq]; congr 1)
+  rw [show (c.pairs.get i).1 = (reduced (c.pairs.get i).2)[j] from hj_eq.symm,
+      show (c.pairs.get (nextFin i c.length_pos)).1 =
+        (reduced (c.pairs.get i).2)[(reduced (c.pairs.get i).2).length - 1] from hk_eq.symm]
+  exact hcompat _ ⟨j, hj⟩ ⟨_, hk⟩ hjk
 
 /-- Apply Irving's rotation elimination to a reduced table: for each
     position `i`, remove `p_{i+1 mod r}` from `qᵢ`'s list and `qᵢ` from
@@ -158,6 +175,44 @@ noncomputable def eliminateRotation
       else if a = p_next then some q_i
       else none
     (reduced a).filter (· ∉ removals)
+
+private lemma filter_indices_ordered {α : Type*} (l : List α) (p : α → Bool)
+    {j k : ℕ} (hj : j < (l.filter p).length) (hk : k < (l.filter p).length) (hjk : j < k) :
+    ∃ (j' : ℕ) (_ : j' < l.length) (k' : ℕ) (_ : k' < l.length),
+      j' < k' ∧ l[j'] = (l.filter p)[j] ∧ l[k'] = (l.filter p)[k] := by
+  induction l generalizing j k with
+  | nil => simp at hj
+  | cons a t ih =>
+    by_cases ha : p a = true
+    · rw [List.filter_cons_of_pos ha] at hj hk
+      simp only [List.length_cons] at hj hk ⊢
+      cases j with
+      | zero =>
+        cases k with
+        | zero => omega
+        | succ k' =>
+          have hk' : k' < (t.filter p).length := by omega
+          have := List.filter_sublist (p := p) (l := t) |>.subset (List.getElem_mem hk')
+          obtain ⟨k'', hk'', hk''_eq⟩ := List.mem_iff_getElem.mp this
+          exact ⟨0, by omega, k'' + 1, by omega, by omega,
+                 by simp [List.filter_cons_of_pos ha],
+                 by simp [List.getElem_cons_succ, List.filter_cons_of_pos ha, hk''_eq]⟩
+      | succ j' =>
+        cases k with
+        | zero => omega
+        | succ k' =>
+          have hj' : j' < (t.filter p).length := by omega
+          have hk' : k' < (t.filter p).length := by omega
+          obtain ⟨j'', hj'', k'', hk'', hjk'', hj''_eq, hk''_eq⟩ := ih hj' hk' (by omega)
+          exact ⟨j'' + 1, by omega, k'' + 1, by omega, by omega,
+                 by simp [List.getElem_cons_succ, List.filter_cons_of_pos ha, hj''_eq],
+                 by simp [List.getElem_cons_succ, List.filter_cons_of_pos ha, hk''_eq]⟩
+    · rw [List.filter_cons_of_neg ha] at hj hk
+      simp only [List.length_cons] at ⊢
+      obtain ⟨j', hj', k', hk', hjk', hj'_eq, hk'_eq⟩ := ih hj hk hjk
+      exact ⟨j' + 1, by omega, k' + 1, by omega, by omega,
+             by simp [List.getElem_cons_succ, List.filter_cons_of_neg ha, hj'_eq],
+             by simp [List.getElem_cons_succ, List.filter_cons_of_neg ha, hk'_eq]⟩
 
 omit [Fintype α] in
 /-- **The hedonic cascade produces Irving's rotation elimination.**
@@ -191,4 +246,28 @@ theorem cascade_produces_irving_elimination
     let reduced' := eliminateRotation reduced c
     ReducedTableSymmetric reduced' ∧
     ReducedListCompatible reduced' prof := by
-  sorry
+  refine ⟨fun a b => ?_, fun a j k hjk => ?_⟩
+  · -- ReducedTableSymmetric: b ∈ reduced' a ↔ a ∈ reduced' b
+    simp only [eliminateRotation, List.mem_filter, decide_eq_true_eq]
+    constructor <;> intro ⟨hmem, hnotrem⟩
+    · refine ⟨(hsym a b).mp hmem, ?_⟩
+      intro habs
+      apply hnotrem
+      rw [List.mem_filterMap] at habs ⊢
+      obtain ⟨idx, hidx, hf⟩ := habs
+      exact ⟨idx, hidx, by
+        split at hf <;> [split <;> simp_all; split at hf <;> [split <;> simp_all; simp at hf]]⟩
+    · refine ⟨(hsym b a).mp hmem, ?_⟩
+      intro habs
+      apply hnotrem
+      rw [List.mem_filterMap] at habs ⊢
+      obtain ⟨idx, hidx, hf⟩ := habs
+      exact ⟨idx, hidx, by
+        split at hf <;> [split <;> simp_all; split at hf <;> [split <;> simp_all; simp at hf]]⟩
+  · -- ReducedListCompatible: filter preserves preference ordering
+    obtain ⟨j', hj', k', hk', hjk', hj'_eq, hk'_eq⟩ :=
+      filter_indices_ordered (reduced a) _ j.isLt k.isLt hjk
+    have h := hcompat a ⟨j', hj'⟩ ⟨k', hk'⟩ hjk'
+    convert h using 3
+    · exact hj'_eq.symm
+    · exact hk'_eq.symm
