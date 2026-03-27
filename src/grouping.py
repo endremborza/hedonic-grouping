@@ -8,8 +8,6 @@ Finds a group-stable partition or certifies that none exists.
 Corresponds to Algorithm 4 in the paper, with Algorithms 2-3 as subroutines.
 """
 
-from __future__ import annotations
-
 from copy import deepcopy
 from dataclasses import dataclass, field
 from itertools import combinations
@@ -39,9 +37,7 @@ class Problem:
     forced_moves: list[Coalition] = field(default_factory=list)
 
     @staticmethod
-    def create(
-        agents: list[Agent], prefs: dict[Agent, list[Coalition]]
-    ) -> Problem:
+    def create(agents: list[Agent], prefs: dict[Agent, list[Coalition]]) -> "Problem":
         return Problem(
             agents=agents,
             prefs=prefs,
@@ -122,17 +118,13 @@ def grouping(problem: Problem, exception: Coalition) -> Problem | None:
             progress = False
             for a in problem.agents:
                 active = [
-                    g
-                    for g in problem.out_proposals[a]
-                    if g not in problem.forced_moves
+                    g for g in problem.out_proposals[a] if g not in problem.forced_moves
                 ]
                 if active:
                     continue
                 progress = True
                 available = [
-                    g
-                    for g in problem.prefs[a]
-                    if g not in problem.out_proposals[a]
+                    g for g in problem.prefs[a] if g not in problem.out_proposals[a]
                 ]
                 if not available:
                     return None
@@ -146,9 +138,7 @@ def grouping(problem: Problem, exception: Coalition) -> Problem | None:
         moved = False
         for a in problem.agents:
             remaining = [
-                g
-                for g in problem.prefs[a]
-                if g not in problem.out_proposals[a]
+                g for g in problem.prefs[a] if g not in problem.out_proposals[a]
             ]
             if not remaining:
                 continue
