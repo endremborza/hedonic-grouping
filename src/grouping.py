@@ -35,7 +35,7 @@ class Problem:
     preferences: dict[Agent, list[Coalition]]
     out_proposals: dict[Agent, list[Coalition]] = field(default_factory=dict)
     in_proposals: dict[Agent, list[Proposal]] = field(default_factory=dict)
-    forced_moves: list[Coalition] = field(default_factory=list)
+    forced_moves: set[Coalition] = field(default_factory=set)
 
     @staticmethod
     def create(agents: list[Agent], prefs: dict[Agent, list[Coalition]]) -> "Problem":
@@ -44,7 +44,6 @@ class Problem:
             preferences=prefs,
             out_proposals={a: [] for a in agents},
             in_proposals={a: [] for a in agents},
-            forced_moves=[],
         )
 
     def solution(self) -> dict[Agent, Coalition] | None:
@@ -55,6 +54,20 @@ class Problem:
                 return None
             result[a] = self.preferences[a][0]
         return result
+
+    def does_agent_have_valid_outgoing_proposal(self, a: Agent) -> bool:
+        for g in self.out_proposals[a]:
+            if g not in self.forced_moves:
+                return True
+        return False
+
+    def get_agent_top_unproposed_preference(self, a: Agent) -> Coalition | None:
+        for g in self.preferences[a]:
+            if g not in self.out_proposals[a]:
+                return g
+
+    def get_agent_remaining_preferences(self, a: Agent) -> list[Coalition]:
+        return [g for g in self.preferences[a] if g not in self.out_proposals[a]]
 
 
 def eliminate(problem: Problem, coalitions: list[Coalition]) -> None:
@@ -109,7 +122,7 @@ def grouping(problem: Problem, exception: Coalition) -> Problem | None:
 
     Returns reduced Problem if stable solution found, None if unstable.
     """
-    problem.forced_moves.append(exception)
+    problem.forced_moves.add(exception)
 
     while True:
         # Phase 1: Simplified Reduction (Algorithm 2)
@@ -117,31 +130,20 @@ def grouping(problem: Problem, exception: Coalition) -> Problem | None:
         while progress:
             progress = False
             for a in problem.agents:
-                active = [
-                    g for g in problem.out_proposals[a] if g not in problem.forced_moves
-                ]
-                if active:
+                if problem.does_agent_have_valid_outgoing_proposal(a):
                     continue
                 progress = True
-                available = [
-                    g
-                    for g in problem.preferences[a]
-                    if g not in problem.out_proposals[a]
-                ]
-                if not available:
+                top_preference = problem.get_agent_top_unproposed_preference(a)
+                if top_preference is None:
                     return None
-
-                h = available[0]
-                problem.out_proposals[a].append(h)
-                for b in h - {a}:
-                    _receive_proposal(problem, b, h, a)
+                problem.out_proposals[a].append(top_preference)
+                for b in top_preference - {a}:
+                    _receive_proposal(problem, b, top_preference, a)
 
         # Phase 2: Recursive Processing (Algorithms 3-4)
         moved = False
         for a in problem.agents:
-            remaining = [
-                g for g in problem.preferences[a] if g not in problem.out_proposals[a]
-            ]
+            remaining = problem.get_agent_remaining_preferences(a)
             if not remaining:
                 continue
             moved = True
@@ -274,12 +276,14 @@ if __name__ == "__main__":
         print(f"Verified stable: {is_stable(agents, prefs, result)}")
 
     # Monte Carlo validation
-    print("\nMonte Carlo (n=5, 100 random instances):")
+    n = 6
+    samps = 1000
+    print(f"\nMonte Carlo (n={n}, {samps} random instances):")
     failures = 0
-    for i in range(100):
-        a, p = generate_random(5, seed=i)
+    for i in range(samps):
+        a, p = generate_random(n)
         sol = solve(a, p)
         if sol is not None and not is_stable(a, p, sol):
             failures += 1
-            print(f"  FAILURE at seed {i}")
-    print(f"  {100 - failures}/100 stable")
+            print(f"  FAILURE at {i}")
+    print(f"  {samps - failures}/{samps} stable")
