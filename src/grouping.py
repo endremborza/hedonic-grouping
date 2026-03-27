@@ -182,7 +182,7 @@ def is_stable(
 ) -> bool:
     """Verify core stability: no blocking coalition exists."""
     if solution is None:
-        return True
+        return False
     for a in agents:
         assigned = solution[a]
         if assigned not in original_prefs[a]:
