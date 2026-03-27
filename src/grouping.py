@@ -12,6 +12,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from itertools import combinations
 from typing import TypeAlias
+from functools import reduce
 import random
 
 Agent: TypeAlias = str
@@ -31,7 +32,7 @@ class Problem:
     """Algorithm state: agents, preferences, and proposal tracking."""
 
     agents: list[Agent]
-    prefs: dict[Agent, list[Coalition]]
+    preferences: dict[Agent, list[Coalition]]
     out_proposals: dict[Agent, list[Coalition]] = field(default_factory=dict)
     in_proposals: dict[Agent, list[Proposal]] = field(default_factory=dict)
     forced_moves: list[Coalition] = field(default_factory=list)
@@ -40,7 +41,7 @@ class Problem:
     def create(agents: list[Agent], prefs: dict[Agent, list[Coalition]]) -> "Problem":
         return Problem(
             agents=agents,
-            prefs=prefs,
+            preferences=prefs,
             out_proposals={a: [] for a in agents},
             in_proposals={a: [] for a in agents},
             forced_moves=[],
@@ -50,20 +51,18 @@ class Problem:
         """Extract grouping if solved (each agent has exactly one remaining pref)."""
         result: dict[Agent, Coalition] = {}
         for a in self.agents:
-            if len(self.prefs[a]) != 1:
+            if len(self.preferences[a]) != 1:
                 return None
-            result[a] = self.prefs[a][0]
+            result[a] = self.preferences[a][0]
         return result
 
 
 def eliminate(problem: Problem, coalitions: list[Coalition]) -> None:
     """Remove coalitions from all preferences and proposal tracking (in-place)."""
     removal = set(coalitions)
-    affected: set[Agent] = set()
-    for c in coalitions:
-        affected.update(c)
+    affected: frozenset[Agent] = reduce(frozenset.union, removal)
     for a in affected:
-        problem.prefs[a] = [g for g in problem.prefs[a] if g not in removal]
+        problem.preferences[a] = [g for g in problem.preferences[a] if g not in removal]
         problem.out_proposals[a] = [
             g for g in problem.out_proposals[a] if g not in removal
         ]
@@ -78,24 +77,25 @@ def _receive_proposal(
     """Process incoming proposal. Triggers elimination if it becomes considerable.
 
     A proposal is considerable (Definition 2) when all other members of the
-    coalition have proposed it. For size-2 coalitions, one proposer suffices.
+    coalition have proposed it.
     """
-    existing = next(
-        (p for p in problem.in_proposals[receiver] if p.coalition == coalition),
-        None,
-    )
+    existing = None
+    for p in problem.in_proposals[receiver]:
+        if p.coalition == coalition:
+            existing = p
+            break
+
     if existing is None:
-        problem.in_proposals[receiver].append(
-            Proposal(coalition=coalition, proposers={proposer})
-        )
-        became_considerable = len(coalition) == 2
+        existing = Proposal(coalition=coalition, proposers={proposer})
+        problem.in_proposals[receiver].append(existing)
     else:
         existing.proposers.add(proposer)
-        became_considerable = len(existing.proposers) >= len(coalition) - 1
 
-    if became_considerable and coalition in problem.prefs[receiver]:
-        rank = problem.prefs[receiver].index(coalition)
-        worse = list(problem.prefs[receiver][rank + 1 :])
+    became_considerable = len(existing.proposers) >= len(coalition) - 1
+
+    if became_considerable and coalition in problem.preferences[receiver]:
+        rank = problem.preferences[receiver].index(coalition)
+        worse = problem.preferences[receiver][rank + 1 :]
         if worse:
             eliminate(problem, worse)
 
@@ -124,7 +124,9 @@ def grouping(problem: Problem, exception: Coalition) -> Problem | None:
                     continue
                 progress = True
                 available = [
-                    g for g in problem.prefs[a] if g not in problem.out_proposals[a]
+                    g
+                    for g in problem.preferences[a]
+                    if g not in problem.out_proposals[a]
                 ]
                 if not available:
                     return None
@@ -138,7 +140,7 @@ def grouping(problem: Problem, exception: Coalition) -> Problem | None:
         moved = False
         for a in problem.agents:
             remaining = [
-                g for g in problem.prefs[a] if g not in problem.out_proposals[a]
+                g for g in problem.preferences[a] if g not in problem.out_proposals[a]
             ]
             if not remaining:
                 continue
