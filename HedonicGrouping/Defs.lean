@@ -125,13 +125,13 @@ and cascade dynamics that the formal lemmas reference.
 structure AlgState (α : Type*) [DecidableEq α] where
   prefs       : α → List (Finset α)
   outProps    : α → List (Finset α)
-  forcedMoves : List (Finset α)
+  forcedMoves : Finset (Finset α)
 
 /-- Initialize algorithm state from a preference profile. -/
 def AlgState.init (prof : PreferenceProfile α) : AlgState α where
   prefs := prof
   outProps := fun _ => []
-  forcedMoves := []
+  forcedMoves := {}
 
 /-- Proposal map: each agent's currently active outgoing proposal (the most
     recent one not in `forcedMoves`). Connects `AlgState` to the
