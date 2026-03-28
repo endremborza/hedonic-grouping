@@ -1,53 +1,41 @@
 import Mathlib
 import HedonicGrouping.Defs
 
+namespace HedonicGrouping.Irving
+
 open HedonicGrouping.Defs
 
 /-!
-# Lemma 2 — Irving Correspondence (Paper §5)
+# Irving — Definitions and Correspondence Proof (Paper §5, Lemma 2)
 
-**Claim:** Under size-2 non-bipartite preferences, the hedonic grouping
-algorithm's processing phase is outcome-equivalent to Irving's Phase 2
-rotation elimination. Both detect the same cyclic structures in the reduced
-preference table and eliminate the same pairs.
+Defines rotation cycles, the reduced preference table invariants, and
+rotation elimination, then proves that the hedonic grouping algorithm's
+cascade mechanism is outcome-equivalent to Irving's Phase 2.
+
+**Claim:** Under size-2 non-bipartite preferences, hedonic processing
+produces the same rotation eliminations as Irving's Phase 2. Both detect
+the same cyclic structures in the reduced preference table and eliminate
+the same pairs.
 
 ## Proof strategy
 
-The prior formalization attempted `IsMoveOnChain → IsIrvingRotation` under
-a single proposal map `prop`. This was provably false: `IsMoveOnChain`
-requires `prop pᵢ ≠ some {pᵢ, qᵢ}` (proposers moved on past their chain
-partner) while `IsIrvingRotation` required `prop pᵢ = some {pᵢ, qᵢ}`
-(proposers hold their chain partner). These are contradictory because they
-describe *different algorithm states* for the same cycle — post-cascade vs
-pre-cascade — and no single `prop` can satisfy both.
-
 The correct mediating structure is the **reduced preference table**
-(`α → List α`): after Phase 1 / Simplified Reduction, each agent has a
-list of remaining acceptable partners in preference order. Irving's
-rotation is defined directly on this table (Irving 1985, Def 2.5):
+(`α → List α`): after Phase 1, each agent has a list of remaining
+acceptable partners in preference order. Irving's rotation is defined
+directly on this table (Irving 1985, Def 2.5):
 
     (p₀, q₀), …, (p_{r−1}, q_{r−1})
     where  qᵢ = second(pᵢ)  and  p_{i+1 mod r} = last(qᵢ)
 
-The hedonic algorithm's move-on mechanism traverses the same second→last
-chain: forcing `p₀` to propose `second(p₀)` triggers a rejection cascade
-(each `qᵢ` rejects `last(qᵢ)`, who then proposes *their* second choice)
-that follows exactly the rotation's structure. Both identify the same
-cycle and eliminate the pair `{qᵢ, p_{(i+1) mod r}}` at each position —
-removing the last entry from each `qᵢ`'s reduced list.
+The hedonic cascade traverses the same second→last chain, identifying
+the same cycle and eliminating the same pair `{qᵢ, p_{(i+1) mod r}}`
+at each position.
 
-## What is proven
+## Key results
 
-- `IsRotation`: standard Irving rotation defined on reduced lists with no
-  reference to a proposal map. Fixes the prior `IsIrvingRotation` which
-  conflated the rotation structure with a specific algorithm state.
-- `eliminatedPair`: the pair removed at each cycle position (shared by
-  both algorithms, definitionally identical).
-- `rotation_eliminates_less_preferred`: at each position, the eliminated
-  partner is strictly less preferred (via `ReducedListCompatible` +
-  `ReducedTableSymmetric`).
-- `cascade_produces_irving_elimination`: rotation elimination preserves
-  the reduced-table invariants (symmetry and compatibility).
+- `RotationCycle` / `IsRotation`: Irving rotation on reduced lists (no proposal map)
+- `rotation_eliminates_less_preferred`: eliminated partner is strictly less preferred
+- `cascade_produces_irving_elimination`: rotation elimination preserves invariants
 -/
 
 variable {α : Type*} [DecidableEq α] [Fintype α]
@@ -271,3 +259,5 @@ theorem cascade_produces_irving_elimination
     convert h using 3
     · exact hj'_eq.symm
     · exact hk'_eq.symm
+
+end HedonicGrouping.Irving

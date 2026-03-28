@@ -11,8 +11,17 @@ A single recursive algorithm subsumes both Gale-Shapley (bipartite matching) and
 The core algorithm is defined in three parallel representations:
 
 - **Pseudocode** (`tex/algorithms.tex`): LaTeX commands (`\AlgSimplifiedReduction`, `\AlgProcessing`, `\AlgGrouping`) imported by `tex/main.tex`.
-- **Lean 4** (`HedonicGrouping/Defs.lean`): `AlgState`, `propMap`, `reducedTable`, `cascadeStep` — the formal backbone that lemmas reference.
-- **Python** (`src/grouping.py`): Reference implementation with stability verification and random instance generation. Run with `python src/grouping.py`.
+- **Lean 4** (`HedonicGrouping/`): Formal definitions and proofs. `Defs.lean` (common framework), `GaleShapley.lean` (GS correspondence), `Irving.lean` (Irving correspondence).
+- **Python** (`src/`): Reference implementations with stability verification and random instance generation:
+  - `src/common.py` — Types (`Agent`, `Coalition`), stability verifiers, random generators
+  - `src/gale_shapley.py` — Gale-Shapley for stable marriage (O(n^2), bipartite size-2)
+  - `src/irving.py` — Irving's algorithm for stable roommates (O(n^2), non-bipartite size-2)
+  - `src/hedonic.py` — General hedonic grouping (Algorithm 4, exponential worst-case)
+  - `src/test_algorithms.py` — Tests for all algorithms: `python -m src.test_algorithms`
+
+### College admissions
+
+The many-to-one matching problem (colleges with quotas) is subsumed by the hedonic framework — each coalition includes a college and a student subset. This creates a combinatorial explosion: a college with quota q among n students generates C(n,q) coalitions, many equivalent from the college's perspective. Specialized algorithms (college-proposing GS, Roth-Peranson) exploit this structure for polynomial solutions; the general hedonic algorithm handles it correctly but with exponential cost.
 
 ## Paper Structure
 
@@ -25,25 +34,26 @@ The accompanying paper (`tex/main.tex`) introduces a framework `<A, Omega, M>` f
 
 ## Formalization State
 
-### Defs.lean — Complete
+### Defs.lean — Common definitions
 
-`PreferenceProfile`, `Considerable`, `BlockingCoalition`, `CoreStable`, `SizeTwo`, validity predicates. Maps directly to the paper's `<A, Omega, M>` framework. Also defines `AlgState` (algorithm state), `propMap` (connects to `Considerable`), `reducedTable` (connects to Lemma 2 rotations), `cascadeStep` (one step of the move-on cascade).
+`PreferenceProfile`, `Considerable`, `BlockingCoalition`, `CoreStable`, `SizeTwo`, validity predicates. Maps directly to the paper's `<A, Omega, M>` framework. Also defines `AlgState` (algorithm state), `propMap` (connects to `Considerable`), `reducedTable` (connects to Irving rotations), `cascadeStep` (one step of the move-on cascade).
 
-### Lemma1.lean — Complete (no sorries)
+### GaleShapley.lean — Complete (no sorries)
+
+Defines bipartite structure (`BipartiteStructure`, `BipartitePref`) and GS "holds" relation (`GSHolds`). Proves the hedonic algorithm's considerable condition reduces to GS holds on pairs:
 
 - `considerable_iff_mutual_proposal`: on size-2 pair {a,b}, considerable iff the other agent proposes it
 - `considerable_eq_gsHolds`: considerable = GS "holds" relation
 - `lemma1_considerable_matches_gs`: main statement with bipartite hypotheses
 
-### Lemma2.lean — Complete (no sorries)
+### Irving.lean — Complete (no sorries)
 
-- `RotationCycle`: cycle structure for Irving rotations (pairs of proposer + second-choice partner)
-- `IsRotation`: standard Irving rotation defined on **reduced preference lists** — `q_i = second(p_i)`, `p_{i+1} = last(q_i)`, `p_i ≠ p_{i+1}`. No proposal map; this is a property of the reduced table alone.
-- `eliminatedPair`: pair eliminated at each cycle position (definitionally shared by both algorithms)
+Defines rotation cycles (`RotationCycle`, `IsRotation`) on reduced preference lists — no proposal map. Proves the hedonic cascade is outcome-equivalent to Irving's Phase 2:
+
+- `rotation_eliminates_less_preferred`: eliminated partner is strictly less preferred
+- `cascade_produces_irving_elimination`: rotation elimination preserves symmetry and compatibility invariants
 - `eliminateRotation`: applies Irving's rotation elimination to a reduced table
-- `ReducedListCompatible`, `ReducedTableSymmetric`: invariants connecting reduced lists to the full preference profile
-- `rotation_eliminates_less_preferred`: at each position, the eliminated partner is strictly less preferred. Uses symmetry to locate `p_i` on `q_i`'s list before `p_{i+1}`, then applies `ReducedListCompatible`.
-- `cascade_produces_irving_elimination`: rotation elimination preserves both reduced-table invariants. Symmetry preservation uses the removal predicate's inherent symmetry (swapping `q_i ↔ p_{i+1}`); compatibility uses `filter_indices_ordered` to show filtering preserves relative index ordering.
+- `ReducedListCompatible`, `ReducedTableSymmetric`: invariants connecting reduced lists to the full profile
 
 ## Proof Strategy for Lemma 2
 
@@ -79,32 +89,32 @@ Install: `uv tool install axiom-axle`
 
 **Checking** (type-check via AXLE remote environment):
 ```
-make check               type-check Defs + Lemma1 + Lemma2
+make check               type-check Defs + GaleShapley + Irving
 make check-defs          check HedonicGrouping/Defs.lean only
-make check-lemma1        check HedonicGrouping/Lemma1.lean only
-make check-lemma2        check HedonicGrouping/Lemma2.lean only
+make check-gs            check HedonicGrouping/GaleShapley.lean only
+make check-irving        check HedonicGrouping/Irving.lean only
 make check-strict        same, but exit non-zero on any sorry
 ```
 
 **Stress-testing** (proof-by-negation):
 ```
-make disprove            run disprove on Lemma1 + Lemma2
-make disprove-lemma1     disprove Lemma1 only
-make disprove-lemma2     disprove Lemma2 only
+make disprove            run disprove on GaleShapley + Irving
+make disprove-gs         disprove GaleShapley only
+make disprove-irving     disprove Irving only
 make disprove TIMEOUT=300  longer timeout for hard goals
 ```
 
 **Proof development**:
 ```
 make sorry2lemma         extract open sorrys as standalone lemmas
-make sorry2lemma FILE=HedonicGrouping/Lemma2.lean NAMES=foo  target specific theorem
-make repair              attempt auto-repair on default file (Lemma2)
-make repair FILE=HedonicGrouping/Lemma2.lean NAMES=rotation_eliminates_less_preferred
+make sorry2lemma FILE=HedonicGrouping/Irving.lean NAMES=foo  target specific theorem
+make repair              attempt auto-repair on default file (Irving)
+make repair FILE=HedonicGrouping/Irving.lean NAMES=rotation_eliminates_less_preferred
 ```
 
 **Finalizing**:
 ```
-make simplify            clean up proofs in Lemma1 + Lemma2
+make simplify            clean up proofs in GaleShapley + Irving
 make extract             split into per-theorem files -> HedonicGrouping/extracted/
 make extract EXTRACT_DIR=/tmp/artifact  use a different output dir
 ```
@@ -123,6 +133,14 @@ lake build
 ```
 
 Requires Lean 4 + Mathlib. Toolchain managed by `elan`.
+
+## Running Python Tests
+
+```
+python -m src.test_algorithms
+```
+
+Runs Gale-Shapley, Irving, and hedonic grouping tests including Monte Carlo validation and cross-algorithm consistency checks.
 
 ## Remaining Work
 

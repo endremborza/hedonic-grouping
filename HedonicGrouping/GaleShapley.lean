@@ -1,28 +1,26 @@
 import Mathlib
 import HedonicGrouping.Defs
 
+namespace HedonicGrouping.GaleShapley
+
 open HedonicGrouping.Defs
 
 /-!
-# Lemma 1 — Gale-Shapley Correspondence (Paper §5)
+# Gale-Shapley — Definitions and Correspondence Proof (Paper §5, Lemma 1)
 
-**Claim:** When restricted to bipartite, size-2 preferences, the hedonic grouping
-algorithm's "considerable" condition reduces to Gale-Shapley's mutual proposal
-("holds") relation. Therefore the algorithm subsumes Gale-Shapley as a special case.
+Defines the bipartite structure and GS "holds" relation, then proves that
+the hedonic grouping algorithm's "considerable" condition reduces to GS's
+mutual proposal on size-2 pairs.
+
+**Claim:** Under bipartite, size-2 preferences, considerable = GS holds.
+The universal quantifier in `Considerable` has only one witness on a pair
+`{a, b}`, so it collapses to a single check on `prop b`.
 
 ## Key results
 
-- `considerable_iff_mutual_proposal`: For a size-2 pair `{a, b}`, "considerable
-  for `a`" iff `b` is proposing `{a, b}`. Since there is only one other member,
-  the universal quantifier in `Considerable` collapses to a single check.
-
-- `considerable_eq_gsHolds`: Reformulation — the considerable condition on
-  `{a, b}` is exactly `GSHolds` (the Gale-Shapley "holds" relation).
-
-- `lemma1_considerable_matches_gs`: The main lemma with full bipartite hypotheses.
-  Under bipartite structure and size-2 preferences, considerable = GS holds.
-  The bipartite/size-2 hypotheses are carried for context but the equivalence
-  depends only on the pair structure.
+- `considerable_iff_mutual_proposal`: size-2 collapse of `Considerable`
+- `considerable_eq_gsHolds`: considerable = `GSHolds`
+- `lemma1_considerable_matches_gs`: main statement with full bipartite hypotheses
 -/
 
 variable {α : Type*} [DecidableEq α] [Fintype α]
@@ -94,3 +92,5 @@ lemma lemma1_considerable_matches_gs
     (_hbWomen : _bp.isMen b = false) :
     Considerable {a, b} a prop ↔ GSHolds prop a b := by
   exact considerable_eq_gsHolds a b hab prop
+
+end HedonicGrouping.GaleShapley
