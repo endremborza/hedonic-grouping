@@ -41,7 +41,7 @@ class _Problem:
     def create(agents: list[Agent], prefs: dict[Agent, list[Coalition]]) -> "_Problem":
         return _Problem(
             agents=agents,
-            preferences=prefs,
+            preferences=deepcopy(prefs),
             out_proposals={a: [] for a in agents},
             in_proposals={a: [] for a in agents},
         )
@@ -49,9 +49,15 @@ class _Problem:
     def solution(self) -> dict[Agent, Coalition] | None:
         result: dict[Agent, Coalition] = {}
         for a in self.agents:
-            if len(self.preferences[a]) != 1:
+            if not self.out_proposals[a]:
                 return None
-            result[a] = self.preferences[a][0]
+            result[a] = self.out_proposals[a][-1]
+
+        # Check if it forms a valid partition
+        for a, g in result.items():
+            for member in g:
+                if result.get(member) != g:
+                    return None
         return result
 
     def has_valid_proposal(self, a: Agent) -> bool:
@@ -92,17 +98,32 @@ def _receive_proposal(
     else:
         existing.proposers.add(proposer)
 
+    # If this proposal is considerable, eliminate worse options for the receiver
     if (
         len(existing.proposers) >= len(coalition) - 1
         and coalition in problem.preferences[receiver]
     ):
+        # 1. If we (the receiver) already hold something BETTER that is also considerable,
+        # then this new one should be eliminated immediately.
         rank = problem.preferences[receiver].index(coalition)
+        for p in problem.in_proposals[receiver]:
+            if p.coalition == coalition:
+                continue
+            if len(p.proposers) >= len(p.coalition) - 1:
+                if p.coalition in problem.preferences[receiver]:
+                    if problem.preferences[receiver].index(p.coalition) < rank:
+                        _eliminate(problem, [coalition])
+                        return
+
+        # 2. Otherwise, eliminate everything worse than this new considerable proposal.
         worse = problem.preferences[receiver][rank + 1 :]
         if worse:
             _eliminate(problem, worse)
 
 
-def _grouping(problem: _Problem, exception: Coalition) -> _Problem | None:
+def _grouping(
+    problem: _Problem, exception: Coalition, original_prefs: dict[Agent, list[Coalition]]
+) -> _Problem | None:
     problem.forced_moves.add(exception)
 
     while True:
@@ -121,6 +142,16 @@ def _grouping(problem: _Problem, exception: Coalition) -> _Problem | None:
                 for b in top - {a}:
                     _receive_proposal(problem, b, top, a)
 
+        # Check if current state is already a stable solution
+        sol = problem.solution()
+        from .common import is_stable_hedonic
+
+        if sol and is_stable_hedonic(original_prefs, sol):
+            # Finalize preferences to match solution
+            for a in problem.agents:
+                problem.preferences[a] = [sol[a]]
+            return problem
+
         # Phase 2: Recursive Processing
         moved = False
         for a in problem.agents:
@@ -129,7 +160,7 @@ def _grouping(problem: _Problem, exception: Coalition) -> _Problem | None:
                 continue
             moved = True
             k = problem.out_proposals[a][-1]
-            result = _grouping(deepcopy(problem), k)
+            result = _grouping(deepcopy(problem), k, original_prefs)
             if result is None:
                 _eliminate(problem, remaining)
             else:
@@ -148,5 +179,5 @@ def solve(prefs: dict[Agent, list[Coalition]]) -> dict[Agent, Coalition] | None:
     """
     agents = list(prefs)
     problem = _Problem.create(agents, prefs)
-    result = _grouping(problem, frozenset())
+    result = _grouping(problem, frozenset(), prefs)
     return result.solution() if result is not None else None
