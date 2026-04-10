@@ -61,13 +61,14 @@ def Considerable (G : Finset α) (a : α) (prop : α → Option (Finset α)) : P
 /--
 `BlockingCoalition prof μ S` — coalition `S` blocks grouping `μ` (§3).
 
-`S` blocks if `|S| ≥ 2` and every member `a ∈ S` strictly prefers `S \ {a}`
-to their current assignment `μ a`. This is the standard core-stability
-blocking condition applied to hedonic games.
+`S` blocks if `|S| ≥ 2` and every member `a ∈ S` strictly prefers `S`
+to their current assignment `μ a`. Coalitions in the preference profile
+include the agent (i.e. `a ∈ G` for every `G ∈ prof a`), so the comparison
+is between `S` and `μ a` directly — both contain `a`.
 -/
 def BlockingCoalition (prof : PreferenceProfile α) (μ : Grouping α) (S : Finset α) : Prop :=
   S.card ≥ 2 ∧
-  ∀ a ∈ S, Ranks prof a (S.erase a) (μ a)
+  ∀ a ∈ S, Ranks prof a S (μ a)
 
 /--
 Core stability (= group stability in §3): no coalition can block the grouping.
