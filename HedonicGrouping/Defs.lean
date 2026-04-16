@@ -32,7 +32,7 @@ coalitions ordered from most preferred to least preferred (strict ranking,
 no ties). Validity (no duplicates, membership) is a separate predicate
 `IsValidProfile`.
 -/
-def PreferenceProfile (α : Type*) := α → List (Finset α)
+def PreferenceProfile (β : Type*) := β → List (Finset β)
 
 /--
 `Ranks prof a G H` — agent `a` strictly prefers coalition `G` to coalition `H`,
@@ -178,5 +178,175 @@ noncomputable def cascadeStep (reduced : α → List α) (p : α) : α → List 
     if a = q then (reduced a).filter (· ≠ p_next)
     else if a = p_next then (reduced a).filter (· ≠ q)
     else reduced a
+
+/-! ### Size-2 pair utilities
+
+Under `SizeTwo` restrictions, coalitions are pairs `{a, b}`. These utilities
+extract the partner and define partner-level preferences, avoiding repeated
+`Finset.card_eq_two` deconstructions throughout the GS and Irving proofs.
+-/
+
+/-- Extract the other member of a size-2 coalition containing `a`. -/
+noncomputable def pairPartner (a : α) (G : Finset α) : α :=
+  ((G.erase a).toList.head?.getD a)
+
+private lemma erase_nonempty_of_card_two {a : α} {G : Finset α}
+    (ha : a ∈ G) (hcard : G.card = 2) : (G.erase a).Nonempty :=
+  Finset.card_pos.mp (by rw [Finset.card_erase_of_mem ha, hcard]; omega)
+
+private lemma erase_toList_ne_nil {a : α} {G : Finset α}
+    (ha : a ∈ G) (hcard : G.card = 2) : (G.erase a).toList ≠ [] :=
+  Finset.Nonempty.toList_ne_nil (erase_nonempty_of_card_two ha hcard)
+
+lemma pairPartner_mem {a : α} {G : Finset α} (ha : a ∈ G) (hcard : G.card = 2) :
+    pairPartner a G ∈ G := by
+  unfold pairPartner
+  have hne := erase_toList_ne_nil ha hcard
+  rw [List.head?_eq_some_head hne, Option.getD_some]
+  have := List.head_mem hne
+  exact Finset.mem_of_mem_erase (Finset.mem_toList.mp this)
+
+lemma pairPartner_ne {a : α} {G : Finset α} (ha : a ∈ G) (hcard : G.card = 2) :
+    pairPartner a G ≠ a := by
+  unfold pairPartner
+  have hne := erase_toList_ne_nil ha hcard
+  rw [List.head?_eq_some_head hne, Option.getD_some]
+  intro heq
+  have := List.head_mem hne
+  have hmem := Finset.mem_toList.mp this
+  rw [Finset.mem_erase] at hmem
+  exact hmem.1 heq
+
+/-- Agent `a` prefers partner `b` to partner `c`:
+    `{a, b}` appears before `{a, c}` in `a`'s preference list. -/
+def PrefersPartner (prof : PreferenceProfile α) (a b c : α) : Prop :=
+  Ranks prof a {a, b} {a, c}
+
+/-! ### Bipartite structure
+
+A partition of agents into two sides (proposers/receivers in GS). Defined here
+rather than in GaleShapley.lean so that Stability.lean can reference it without
+duplication.
+-/
+
+/-- A bipartite partition of agents into two sides. -/
+structure BipartiteStructure (α : Type*) where
+  isMen : α → Bool
+
+def BipartiteStructure.isWomen (bp : BipartiteStructure α) (a : α) : Bool :=
+  !bp.isMen a
+
+/-- Every preferred coalition is cross-partition: in any size-2 pair,
+    one member is from each side. -/
+def BipartitePref (bp : BipartiteStructure α) (prof : PreferenceProfile α) : Prop :=
+  ∀ a : α, ∀ G ∈ prof a, ∀ b ∈ G, ∀ c ∈ G, b ≠ c → bp.isMen b ≠ bp.isMen c
+
+/-! ### Irving reduced table definitions
+
+Definitions for Irving's Phase 1 output and Phase 2 analysis. Moved here from
+Stability.lean so that Irving.lean can reference them directly.
+-/
+
+/-- Phase 1 duality: `first(b) = a → last(a) = b` in the reduced table.
+
+    After Simplified Reduction, if `a` is the first entry on `b`'s reduced
+    list (meaning `b` is currently proposing to `a`), then `b` is the last
+    entry on `a`'s list (the least-preferred remaining option for `a`). -/
+def Phase1Duality (reduced : α → List α) : Prop :=
+  ∀ a b : α, (reduced a).head? = some b →
+    (reduced b).length > 0 ∧ (reduced b).getLastD b = a
+
+/-- All reduced lists have length 1: each agent has exactly one remaining
+    partner. Termination condition for Irving's Phase 2. -/
+def AllSingleton (reduced : α → List α) : Prop :=
+  ∀ a : α, (reduced a).length = 1
+
+/-- Extract the matching implied by a singleton reduced table. -/
+noncomputable def singletonMatching (reduced : α → List α) : Grouping α :=
+  fun a => {a, ((reduced a).head?.getD a)}
+
+/-- Total list lengths — termination measure for Phase 2. -/
+noncomputable def totalLength [Fintype α] (reduced : α → List α) : ℕ :=
+  Finset.univ.sum fun a => (reduced a).length
+
+/-- Blocking pair: both agents strictly prefer being together
+    to their current assignment. Under size-2 preferences, this is the
+    only form of blocking coalition. -/
+def BlockingPair (prof : PreferenceProfile α) (μ : Grouping α) (a b : α) : Prop :=
+  a ≠ b ∧ Ranks prof a {a, b} (μ a) ∧ Ranks prof b {a, b} (μ b)
+
+/-- Pairwise stability: no blocking pair exists. -/
+def PairwiseStable (prof : PreferenceProfile α) (μ : Grouping α) : Prop :=
+  ∀ a b : α, ¬ BlockingPair prof μ a b
+
+/-! ### Core stability ↔ Pairwise stability (size-2)
+
+Under size-2 preferences, every blocking coalition is a pair, so core
+stability and pairwise stability coincide. This bridge is used by both
+the GS and Irving proofs. -/
+
+/-- Under size-2 preferences, any blocking coalition has exactly 2 members. -/
+lemma blocking_coalition_sizeTwo
+    (prof : PreferenceProfile α) (μ : Grouping α) (S : Finset α)
+    (hsize : SizeTwo prof)
+    (hblock : BlockingCoalition prof μ S) :
+    S.card = 2 := by
+  obtain ⟨_, hpref⟩ := hblock
+  obtain ⟨a, ha⟩ := Finset.card_pos.mp (by omega : 0 < S.card)
+  obtain ⟨i, _, _, hi, _⟩ := hpref a ha
+  exact hsize a S (hi ▸ List.getElem_mem (by exact i.isLt))
+
+/-- **Core stability equals pairwise stability under size-2 preferences.** -/
+theorem coreStable_iff_pairwiseStable
+    (prof : PreferenceProfile α) (μ : Grouping α)
+    (hsize : SizeTwo prof) :
+    CoreStable prof μ ↔ PairwiseStable prof μ := by
+  constructor
+  · intro hcore a b hbp
+    obtain ⟨hab, ha_ranks, hb_ranks⟩ := hbp
+    apply hcore {a, b}
+    refine ⟨by simp [Finset.card_pair hab], fun x hx => ?_⟩
+    simp only [Finset.mem_insert, Finset.mem_singleton] at hx
+    cases hx with
+    | inl h => subst h; exact ha_ranks
+    | inr h => subst h; exact hb_ranks
+  · intro hpair S hblock
+    have hcard := blocking_coalition_sizeTwo prof μ S hsize hblock
+    obtain ⟨a, b, hab, hS⟩ := Finset.card_eq_two.mp hcard
+    subst hS
+    exact hpair a b ⟨hab, hblock.2 a (Finset.mem_insert_self a {b}),
+      hblock.2 b (Finset.mem_insert_of_mem (Finset.mem_singleton_self b))⟩
+
+/-! ### College Admissions — Factored / Responsive Preferences (Roth 1985)
+
+Students rank colleges; colleges rank individual students. Coalition
+preferences are *derived*: a student is indifferent between coalitions
+sharing the same college, and a college's preference over student groups
+is responsive to its ranking of individual students.
+-/
+
+/-- College admissions instance. -/
+structure CollegeAdmissions (α : Type*) [DecidableEq α] where
+  isCollege : α → Bool
+  quota : α → ℕ
+  studentRanking : α → List α  -- students rank colleges
+  collegeRanking : α → List α  -- colleges rank individual students
+
+/-- A student's preference class: the college in the coalition (if any). -/
+noncomputable def CollegeAdmissions.studentClass (ca : CollegeAdmissions α) (_a : α)
+    (G : Finset α) : Option α :=
+  (G.filter (fun x => ca.isCollege x = true)).toList.head?
+
+/-- Responsive preference: college `c` prefers group `G` to group `H` if the
+    *worst* student in `G` (according to `collegeRanking c`) is better than the
+    worst student in `H`, breaking ties by group size. This captures the standard
+    responsive extension from individual rankings to subset rankings. -/
+def ResponsivePreference (ca : CollegeAdmissions α) (c : α) (G H : Finset α) : Prop :=
+  let studentsG := G.filter (fun x => ca.isCollege x = false)
+  let studentsH := H.filter (fun x => ca.isCollege x = false)
+  studentsG.card ≥ studentsH.card ∧
+  ∀ s ∈ studentsG, ∃ t ∈ studentsH,
+    let ranking := ca.collegeRanking c
+    ∃ (i : ℕ) (j : ℕ), ranking[i]? = some s ∧ ranking[j]? = some t ∧ i ≤ j
 
 end HedonicGrouping.Defs
