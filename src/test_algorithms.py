@@ -166,13 +166,18 @@ def test_hedonic_monte_carlo() -> None:
 
 
 def test_cross_marriage_hedonic() -> None:
-    """Marriage instances: both GS and hedonic should produce the SAME stable solutions."""
+    """Marriage instances: both GS and hedonic should produce stable solutions.
+
+    GS is proposer-optimal; hedonic is symmetric and may find a different stable
+    matching.  Both must be stable, and hedonic must always find a solution
+    (existence is guaranteed for bipartite).
+    """
     n, samples = 4, 100
     for seed in range(samples):
         men, women, mp, wp = generate_marriage(n, seed)
         gs_matching = gale_shapley(mp, wp)
+        assert is_stable_marriage(mp, wp, gs_matching), f"GS unstable at seed {seed}"
 
-        # Hedonic prefs: men first to match GS proposer-optimality
         hedonic_prefs: dict[str, list[Coalition]] = {}
         for m in men:
             hedonic_prefs[m] = [frozenset({m, w}) for w in mp[m]]
@@ -181,17 +186,23 @@ def test_cross_marriage_hedonic() -> None:
 
         h_sol = hedonic_solve(hedonic_prefs)
         assert h_sol is not None, f"hedonic found no solution at seed {seed}"
+        assert is_stable_hedonic(hedonic_prefs, h_sol), (
+            f"hedonic unstable at seed {seed}"
+        )
 
-        # Compare results
-        for m in men:
-            h_partner = h_sol[m] - {m}
-            assert len(h_partner) == 1
-            w = list(h_partner)[0]
-            assert gs_matching[m] == w, f"Mismatch at seed {seed}: GS={gs_matching[m]}, Hedonic={w}"
+        h_matching = {a: list(coal - {a})[0] for a, coal in h_sol.items()}
+        assert is_stable_marriage(mp, wp, h_matching), (
+            f"hedonic not marriage-stable at seed {seed}"
+        )
 
 
 def test_cross_roommates_hedonic() -> None:
-    """Roommate instances: Irving and hedonic should agree on solvability and solutions."""
+    """Roommate instances: Irving and hedonic should agree on solvability.
+
+    Both must agree on whether a stable matching exists.  When one exists,
+    both solutions must be stable (but may differ — multiple stable matchings
+    can exist).
+    """
     n, samples = 4, 100
     for seed in range(samples):
         agents, prefs = generate_roommates(n, seed)
@@ -204,14 +215,20 @@ def test_cross_roommates_hedonic() -> None:
         h_sol = hedonic_solve(hedonic_prefs)
 
         if irving_result is not None:
-            assert h_sol is not None, f"Irving found solution, Hedonic did not at seed {seed}"
-            for a in agents:
-                h_partner = h_sol[a] - {a}
-                assert len(h_partner) == 1
-                b = list(h_partner)[0]
-                assert irving_result[a] == b, f"Mismatch at seed {seed}: Irving={irving_result[a]}, Hedonic={b}"
+            assert h_sol is not None, (
+                f"Irving found solution, Hedonic did not at seed {seed}"
+            )
+            assert is_stable_roommates(prefs, irving_result), (
+                f"Irving unstable at seed {seed}"
+            )
+            h_matching = {a: list(h_sol[a] - {a})[0] for a in agents}
+            assert is_stable_roommates(prefs, h_matching), (
+                f"Hedonic unstable at seed {seed}"
+            )
         else:
-            assert h_sol is None, f"Irving found no solution, Hedonic found {h_sol} at seed {seed}"
+            assert h_sol is None, (
+                f"Irving found no solution, Hedonic found {h_sol} at seed {seed}"
+            )
 
 
 def test_college_admissions() -> None:
