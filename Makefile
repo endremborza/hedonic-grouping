@@ -1,17 +1,16 @@
 # Makefile — Lean 4 formalization via AXLE (axiommath.ai)
 #
-# All proofs live in lean/. AXLE handles Mathlib remotely; no local lake build needed.
-# Lean binaries are managed by elan at ~/.elan/bin — make sure that is on your PATH.
-# AXLE CLI is installed via: uv tool install axiom-axle
+# AXLE only supports `import Mathlib`, so per-file checks concatenate the
+# target with all of its HedonicGrouping dependencies via
+# `scripts/concat_imports.py`. No hand-maintained cat chains.
 #
-# Typical workflow:
-#   1. make check          — verify all files type-check cleanly
-#   2. make disprove       — stress-test claims (no counterexample = evidence of correctness)
-#   3. make sorry2lemma    — inspect open subgoals (outputs extracted lemma stubs)
-#   4. <fill in proofs>
-#   5. make repair         — let AXLE attempt auto-repair on a file with broken proofs
-#   6. make simplify       — clean up tactic proofs once all sorrys are closed
-#   7. make extract        — split into per-theorem files for publication artifact
+# Workflow:
+#   make check          — type-check every leaf file
+#   make check-FILE=... — check one file and its deps
+#   make disprove       — stress-test claims (no counterexample = evidence)
+#   make sorry2lemma    — inspect open subgoals
+#   make repair         — auto-repair attempts
+#   make simplify       — clean up tactic proofs after all sorrys are closed
 
 export PATH := $(HOME)/.elan/bin:$(PATH)
 
@@ -19,139 +18,124 @@ LEAN_DIR := HedonicGrouping
 ENV      := lean-4.28.0
 AXLE     := axle
 TIMEOUT  := 120
+CONCAT   := python3 scripts/concat_imports.py
 
-DEFS         := $(LEAN_DIR)/Defs.lean
-GALESHAPLEY  := $(LEAN_DIR)/GaleShapley.lean
-IRVING       := $(LEAN_DIR)/Irving.lean
-
-# AXLE only supports `import Mathlib` — files that import Defs must be
-# concatenated with Defs.lean (stripping their local imports) before sending.
-define cat_with_defs
-	(cat $(DEFS); echo; grep -v '^import ' $(1))
-endef
+# All leaf files to check. Add new files here as they appear.
+LEAF_FILES := \
+    $(LEAN_DIR)/Core.lean \
+    $(LEAN_DIR)/Problems/Pairwise.lean \
+    $(LEAN_DIR)/Problems/SMP.lean \
+    $(LEAN_DIR)/Problems/RMP.lean \
+    $(LEAN_DIR)/Problems/HCP.lean \
+    $(LEAN_DIR)/Algorithms/GaleShapley.lean \
+    $(LEAN_DIR)/Algorithms/Irving.lean \
+    $(LEAN_DIR)/Unification.lean \
+    $(LEAN_DIR)/Correctness/GS_SMP.lean \
+    $(LEAN_DIR)/Correctness/IRV_RMP.lean \
+    $(LEAN_DIR)/Summary.lean
 
 # Default target file for repair/sorry2lemma when FILE is not specified.
-FILE ?= $(IRVING)
+FILE ?= $(LEAN_DIR)/Algorithms/Irving.lean
 
 # Output directory for extract-theorems.
 EXTRACT_DIR ?= $(LEAN_DIR)/extracted
 
-.PHONY: all check check-defs check-gs check-irving \
-        sorry2lemma disprove disprove-gs disprove-irving \
-        simplify simplify-gs simplify-irving \
-        extract repair help lean-version
+.PHONY: all check check-one disprove disprove-one \
+        sorry2lemma repair simplify simplify-one \
+        extract help lean-version python-check
 
 # ── check ─────────────────────────────────────────────────────────────────────
-# Type-check files against the AXLE-hosted Lean 4.28.0 + Mathlib environment.
-# "okay: true" in output means the file is fully valid (sorrys still count as valid
-# unless you add --strict, but they are flagged as warnings).
-# Use check-strict for CI-style failure on any sorry.
 
 all: check
 
-check: check-defs check-gs check-irving
+python-check:
+	python -m src.test_algorithms
 
-check-defs:
-	@echo "==> Checking $(DEFS)"
-	$(AXLE) check --environment $(ENV) - < $(DEFS)
+check:
+	@set -e; for f in $(LEAF_FILES); do \
+	    echo "==> Checking $$f"; \
+	    $(CONCAT) $$f | $(AXLE) check --environment $(ENV) -; \
+	done
 
-check-gs:
-	@echo "==> Checking $(GALESHAPLEY)"
-	$(call cat_with_defs,$(GALESHAPLEY)) | $(AXLE) check --environment $(ENV) -
+# Check one file: make check-one FILE=HedonicGrouping/Unification.lean
+check-one:
+	@echo "==> Checking $(FILE)"
+	@$(CONCAT) $(FILE) | $(AXLE) check --environment $(ENV) -
 
-check-irving:
-	@echo "==> Checking $(IRVING)"
-	$(call cat_with_defs,$(IRVING)) | $(AXLE) check --environment $(ENV) -
-
-# Fail with non-zero exit code if there are any errors (sorrys included).
+# Strict check: fail on any sorry.
 check-strict:
-	@echo "==> Strict check: all files"
-	$(AXLE) check --environment $(ENV) --strict - < $(DEFS)
-	$(call cat_with_defs,$(GALESHAPLEY)) | $(AXLE) check --environment $(ENV) --strict -
-	$(call cat_with_defs,$(IRVING)) | $(AXLE) check --environment $(ENV) --strict -
+	@set -e; for f in $(LEAF_FILES); do \
+	    echo "==> Strict check: $$f"; \
+	    $(CONCAT) $$f | $(AXLE) check --environment $(ENV) --strict -; \
+	done
 
 # ── disprove ──────────────────────────────────────────────────────────────────
-# Attempt to prove the *negation* of every theorem in a file.
-# "failed to prove negation" = no counterexample found = positive evidence.
-# "disproved_theorems: [...]" = a claim is wrong; revise it before proceeding.
-# Timeout is per-file. Increase for complex goals: make disprove TIMEOUT=300
 
-disprove: disprove-gs disprove-irving
+disprove:
+	@set -e; for f in $(LEAF_FILES); do \
+	    echo "==> Disprove: $$f"; \
+	    $(CONCAT) $$f | $(AXLE) disprove --environment $(ENV) --timeout-seconds $(TIMEOUT) -; \
+	done
 
-disprove-gs:
-	@echo "==> Disprove: $(GALESHAPLEY)"
-	$(call cat_with_defs,$(GALESHAPLEY)) | $(AXLE) disprove --environment $(ENV) --timeout-seconds $(TIMEOUT) -
-
-disprove-irving:
-	@echo "==> Disprove: $(IRVING)"
-	$(call cat_with_defs,$(IRVING)) | $(AXLE) disprove --environment $(ENV) --timeout-seconds $(TIMEOUT) -
+disprove-one:
+	@echo "==> Disprove: $(FILE)"
+	@$(CONCAT) $(FILE) | $(AXLE) disprove --environment $(ENV) --timeout-seconds $(TIMEOUT) -
 
 # ── sorry2lemma ───────────────────────────────────────────────────────────────
-# Extract every `sorry` placeholder (and unsolved error goals) into standalone
-# top-level lemmas, making the remaining proof obligations explicit.
-# Outputs: JSON metadata + the modified Lean source with extracted stubs.
-# Target a specific file: make sorry2lemma FILE=HedonicGrouping/Irving.lean
-# Target specific theorems: make sorry2lemma FILE=HedonicGrouping/Irving.lean NAMES=foo,bar
 
 NAMES ?=
 
 sorry2lemma:
 	@echo "==> Extracting sorrys from $(FILE)"
-	$(call cat_with_defs,$(FILE)) | $(AXLE) sorry2lemma --environment $(ENV) \
+	@$(CONCAT) $(FILE) | $(AXLE) sorry2lemma --environment $(ENV) \
 	    $(if $(NAMES),--names $(NAMES),) \
 	    --reconstruct-callsite \
 	    -
 
 # ── repair ────────────────────────────────────────────────────────────────────
-# Attempt to automatically repair broken or incomplete proofs.
-# Tries terminal tactics (default: grind) to close open goals.
-# Outputs the repaired Lean source; redirect to file to apply:
-#   make repair FILE=HedonicGrouping/Irving.lean > Irving_repaired.lean
-# Target specific theorems: make repair NAMES=rotation_eliminates_less_preferred
 
 repair:
 	@echo "==> Attempting proof repair on $(FILE)"
-	$(call cat_with_defs,$(FILE)) | $(AXLE) repair-proofs --environment $(ENV) \
+	@$(CONCAT) $(FILE) | $(AXLE) repair-proofs --environment $(ENV) \
 	    $(if $(NAMES),--names $(NAMES),) \
 	    --terminal-tactics grind,simp,omega,decide \
 	    -
 
 # ── simplify ──────────────────────────────────────────────────────────────────
-# Clean up tactic proofs: remove redundant steps, shorten proof blocks.
-# Run this after all sorrys are closed. Outputs the simplified Lean source.
-# Redirect to apply: make simplify-gs > GaleShapley_simplified.lean
 
-simplify: simplify-gs simplify-irving
+simplify:
+	@set -e; for f in $(LEAF_FILES); do \
+	    echo "==> Simplifying $$f"; \
+	    $(CONCAT) $$f | $(AXLE) simplify-theorems --environment $(ENV) -; \
+	done
 
-simplify-gs:
-	@echo "==> Simplifying proofs in $(GALESHAPLEY)"
-	$(call cat_with_defs,$(GALESHAPLEY)) | $(AXLE) simplify-theorems --environment $(ENV) -
-
-simplify-irving:
-	@echo "==> Simplifying proofs in $(IRVING)"
-	$(call cat_with_defs,$(IRVING)) | $(AXLE) simplify-theorems --environment $(ENV) -
+simplify-one:
+	@echo "==> Simplifying $(FILE)"
+	@$(CONCAT) $(FILE) | $(AXLE) simplify-theorems --environment $(ENV) -
 
 # ── extract ───────────────────────────────────────────────────────────────────
-# Split each file into per-theorem .lean files with full dependency tracking.
-# Output goes to EXTRACT_DIR (default: HedonicGrouping/extracted/).
-# Use this to produce the publishable supplementary artifact.
 
 extract:
-	@echo "==> Extracting theorems from $(GALESHAPLEY) → $(EXTRACT_DIR)"
-	$(call cat_with_defs,$(GALESHAPLEY)) | $(AXLE) extract-theorems --environment $(ENV) \
-	    --output-dir $(EXTRACT_DIR) --force -
-	@echo "==> Extracting theorems from $(IRVING) → $(EXTRACT_DIR)"
-	$(call cat_with_defs,$(IRVING)) | $(AXLE) extract-theorems --environment $(ENV) \
-	    --output-dir $(EXTRACT_DIR) --force -
+	@for f in $(LEAF_FILES); do \
+	    echo "==> Extracting from $$f → $(EXTRACT_DIR)"; \
+	    $(CONCAT) $$f | $(AXLE) extract-theorems --environment $(ENV) \
+	        --output-dir $(EXTRACT_DIR) --force -; \
+	done
 
 # ── lean-version ──────────────────────────────────────────────────────────────
+
 lean-version:
 	@lean --version
 	@lake --version
 	@$(AXLE) --version
 	@$(AXLE) environments
 
-# ── help ──────────────────────────────────────────────────────────────────────
 help:
-	@echo "See README.md for full target documentation and AXLE workflow."
-	@echo "AXLE environment: $(ENV)  |  Toolchain: $(HOME)/.elan/bin"
+	@echo "Targets:"
+	@echo "  check           — type-check every leaf file"
+	@echo "  check-one       — check one file (FILE=...)"
+	@echo "  disprove        — stress-test claims"
+	@echo "  sorry2lemma     — extract sorry goals (FILE=..., NAMES=...)"
+	@echo "  repair          — auto-repair attempts (FILE=..., NAMES=...)"
+	@echo "  simplify        — clean up tactic proofs"
+	@echo "  python-check    — run Python reference tests"
