@@ -1,33 +1,55 @@
 import Mathlib
-import HedonicGrouping.Defs
+import HedonicGrouping.Core
+import HedonicGrouping.Problems.Pairwise
 
-namespace HedonicGrouping.Irving
-
-open HedonicGrouping.Defs
-
+namespace HedonicGrouping.Algorithms.Irving
 /-!
-# Irving — Full Algorithm and Stability Proof (Paper §5, Lemma 2)
+# Irving's stable roommates algorithm
 
-Formalizes Irving's stable roommates algorithm (1985) and proves that it
-correctly decides the existence of a stable matching under size-2 preferences.
+Phase 1: proposal-rejection loop producing a reduced preference table.
+Phase 2: iterated rotation elimination.
 
-## Structure
-
-1. **Rotation machinery** (Lemma 2): Rotation cycles on reduced preference
-   tables, elimination preserves invariants. (Preserved from prior formalization.)
-2. **Phase 1**: Proposal-rejection loop producing a reduced table satisfying
-   `ReducedTableSymmetric`, `ReducedListCompatible`, and `Phase1Duality`.
-3. **Phase 2**: Iterated rotation elimination with termination proof.
-4. **Endpoint theorems**: Singleton → stable, Empty → no stable matching.
-5. **Decidability**: Irving's algorithm decides stability for size-2 preferences.
+Internal reasoning is pairwise: theorems conclude `PairwiseStable`
+(or negation thereof). The `CoreStable` upgrade under size-2 is performed
+in `Correctness.IRV_RMP` via the `Unification` bridge.
 -/
+
+open HedonicGrouping.Core
+open HedonicGrouping.Problems.Pairwise
 
 variable {α : Type*} [DecidableEq α] [Fintype α]
 
-/-! ## Part 1: Rotation machinery (Lemma 2)
+/-! ## Reduced-table invariants -/
 
-Rotation cycles on reduced preference tables. Elimination preserves the
-key invariants (symmetry and compatibility). -/
+/-- Phase 1 duality: `first(b) = a → last(a) = b`. -/
+def Phase1Duality (reduced : α → List α) : Prop :=
+  ∀ a b : α, (reduced a).head? = some b →
+    (reduced b).length > 0 ∧ (reduced b).getLastD b = a
+
+/-- All reduced lists have length 1: each agent has exactly one remaining
+    partner. -/
+def AllSingleton (reduced : α → List α) : Prop :=
+  ∀ a : α, (reduced a).length = 1
+
+/-- Extract the matching implied by a singleton reduced table. -/
+noncomputable def singletonMatching (reduced : α → List α) : Grouping α :=
+  fun a => {a, ((reduced a).head?.getD a)}
+
+/-- Total list lengths — termination measure for Phase 2. -/
+noncomputable def totalLength [Fintype α] (reduced : α → List α) : ℕ :=
+  Finset.univ.sum fun a => (reduced a).length
+
+/-- Reduced list preserves original preference ordering. -/
+def ReducedListCompatible (reduced : α → List α)
+    (prof : PreferenceProfile α) : Prop :=
+  ∀ a : α, ∀ j k : Fin (reduced a).length,
+    j < k → Ranks prof a {a, (reduced a)[j]} {a, (reduced a)[k]}
+
+/-- `b ∈ reduced a ↔ a ∈ reduced b`. -/
+def ReducedTableSymmetric (reduced : α → List α) : Prop :=
+  ∀ a b : α, b ∈ reduced a ↔ a ∈ reduced b
+
+/-! ## Rotation machinery -/
 
 /-- A rotation cycle: proposer-partner pairs forming a cycle of length ≥ 2. -/
 structure RotationCycle (α : Type*) where
@@ -43,7 +65,7 @@ lemma RotationCycle.length_pos (c : RotationCycle α) : 0 < c.pairs.length :=
 def nextFin {r : ℕ} (i : Fin r) (hr : 0 < r) : Fin r :=
   ⟨(i.val + 1) % r, Nat.mod_lt _ hr⟩
 
-/-- Irving rotation on reduced preference lists (Irving 1985, Phase 2).
+/-- Irving rotation on reduced preference lists.
     `qᵢ = second(pᵢ)` and `p_{i+1 mod r} = last(qᵢ)`. -/
 def IsRotation (c : RotationCycle α) (reduced : α → List α) : Prop :=
   ∀ i : Fin c.pairs.length,
@@ -54,17 +76,7 @@ def IsRotation (c : RotationCycle α) (reduced : α → List α) : Prop :=
     (reduced q_i).getLastD q_i = p_next ∧ (reduced q_i) ≠ [] ∧
     p_i ≠ p_next
 
-/-- The reduced list preserves the preference ordering from the full profile. -/
-def ReducedListCompatible (reduced : α → List α)
-    (prof : PreferenceProfile α) : Prop :=
-  ∀ a : α, ∀ j k : Fin (reduced a).length,
-    j < k → Ranks prof a {a, (reduced a)[j]} {a, (reduced a)[k]}
-
-/-- Symmetry invariant: `b` is on `a`'s list iff `a` is on `b`'s. -/
-def ReducedTableSymmetric (reduced : α → List α) : Prop :=
-  ∀ a b : α, b ∈ reduced a ↔ a ∈ reduced b
-
-/-- Apply Irving's rotation elimination to a reduced table. -/
+/-- Apply rotation elimination. -/
 noncomputable def eliminateRotation
     (reduced : α → List α) (c : RotationCycle α) : α → List α :=
   fun a =>
@@ -150,8 +162,8 @@ private lemma filter_indices_ordered {α : Type*} (l : List α) (p : α → Bool
              by simp [List.getElem_cons_succ, List.filter_cons_of_neg ha, hj'_eq],
              by simp [List.getElem_cons_succ, List.filter_cons_of_neg ha, hk'_eq]⟩
 
-/-- **Lemma 2 — Irving rotation elimination preserves reduced table invariants.** -/
-theorem lemma2_rotation_elimination_preserves_invariants
+/-- **Rotation elimination preserves reduced-table invariants.** -/
+theorem rotation_elimination_preserves_invariants
     (c : RotationCycle α)
     (reduced : α → List α)
     (prof : PreferenceProfile α)
@@ -186,18 +198,7 @@ theorem lemma2_rotation_elimination_preserves_invariants
     · exact hj'_eq.symm
     · exact hk'_eq.symm
 
-/-! ## Part 2: Phase 1 — Proposal-Rejection loop
-
-Phase 1 is structurally similar to Gale-Shapley but without the bipartite
-constraint: any agent can propose to any other agent. The output is a
-reduced preference table satisfying symmetry, compatibility, and the
-Phase 1 duality invariant.
-
-We formalize Phase 1 abstractly: rather than defining the step-by-step
-algorithm (which would duplicate GS machinery), we characterize the
-*output properties* that Phase 1 guarantees, and prove that such a reduced
-table exists for any valid size-2 preference profile.
--/
+/-! ## Phase 1 — proposal-rejection loop -/
 
 noncomputable section
 open Classical
@@ -207,10 +208,10 @@ structure P1State (α : Type*) [DecidableEq α] where
   table : α → List α
   held : α → Option α
 
-/-- Initialize Phase 1 from a preference profile (size-2 partner lists). -/
-def P1State.init (prof : PreferenceProfile α) (hsize : SizeTwo prof) : P1State α where
+/-- Initialize Phase 1 from a size-2 preference profile. -/
+def P1State.init (prof : PreferenceProfile α) (_hsize : SizeTwo prof) : P1State α where
   table := fun a => (prof a).filterMap fun G =>
-    if h : G.card = 2 ∧ a ∈ G then some (pairPartner a G) else none
+    if _h : G.card = 2 ∧ a ∈ G then some (pairPartner a G) else none
   held := fun _ => none
 
 /-- Agent `a` is free: unmatched and has remaining candidates. -/
@@ -221,17 +222,13 @@ def P1Free (s : P1State α) (a : α) : Prop :=
 def P1Terminated (s : P1State α) : Prop :=
   ¬ ∃ a, P1Free s a
 
-/-- One Phase 1 step: free agent `a` proposes to first on their list `b`.
-    If `b` is free, `b` holds `a`. If `b` holds `bOld` and prefers `a`, then
-    `b` drops `bOld` (removing the pair from both lists). Otherwise `a` is
-    rejected (removed from `b`'s list and `b` from `a`'s). -/
+/-- One Phase 1 step: free agent `a` proposes to first on their list. -/
 def P1State.stepWith (s : P1State α) (a b : α) : P1State α :=
   match s.held b with
   | none =>
     { table := s.table
       held := fun x => if x = b then some a else s.held x }
   | some bOld =>
-    -- b prefers a to bOld if a appears before bOld in b's table
     if (s.table b).findIdx (· == a) < (s.table b).findIdx (· == bOld) then
       { table := fun x =>
           if x = b then (s.table b).filter (fun y => y ≠ bOld)
@@ -248,18 +245,14 @@ def P1State.stepWith (s : P1State α) (a b : α) : P1State α :=
           else s.table x
         held := s.held }
 
-/-- Total list length — termination measure for Phase 1. -/
+/-- Termination measure for Phase 1. -/
 noncomputable def P1State.totalLength (s : P1State α) : ℕ :=
   Finset.univ.sum fun a => (s.table a).length
 
-/-- Phase 1 produces a valid reduced table. This is the main Phase 1 theorem.
-
-    Starting from a valid size-2 preference profile, the proposal-rejection
-    loop terminates with a reduced table satisfying:
-    1. `ReducedTableSymmetric` — mutual acceptability
-    2. `ReducedListCompatible` — original preference ordering preserved
-    3. `Phase1Duality` — first(b) = a ↔ last(a) = b
-    4. All lists nonempty (or the instance has no stable matching) -/
+/-- **Phase 1 output.** Starting from a valid size-2 profile, the
+    proposal-rejection loop terminates with a reduced table that is
+    symmetric, compatible, dual, and either nowhere-empty or the instance
+    has no pairwise-stable matching. -/
 theorem phase1_produces_reduced_table
     (prof : PreferenceProfile α) (hsize : SizeTwo prof) (hvalid : IsValidProfile prof) :
     ∃ (reduced : α → List α),
@@ -267,19 +260,14 @@ theorem phase1_produces_reduced_table
       ReducedListCompatible reduced prof ∧
       Phase1Duality reduced ∧
       (∀ a : α, (reduced a) ≠ [] ∨
-        ∀ μ : Grouping α, ¬ CoreStable prof μ) := by
+        ∀ μ : Grouping α, ¬ PairwiseStable prof μ) := by
   sorry -- Proof: Run the proposal-rejection loop.
          -- Termination: totalLength strictly decreases with each rejection.
          -- Symmetry: each rejection removes both directions.
          -- Compatibility: only tail-truncation, never reordering.
-         -- Duality: if first(b) = a, then a holds b, and b is last on a's list
-         --   because all agents after a on b's list were removed (they proposed
-         --   and were rejected or b truncated past them).
+         -- Duality: if first(b) = a, then a holds b, and b is last on a's list.
 
-/-! ## Part 3: Phase 2 — Iterated rotation elimination
-
-Repeatedly find and eliminate rotations until all lists are singleton
-(stable matching) or some list becomes empty (no stable matching). -/
+/-! ## Phase 2 — iterated rotation elimination -/
 
 /-- Rotation elimination strictly decreases total list lengths. -/
 theorem eliminateRotation_decreases_totalLength
@@ -290,24 +278,16 @@ theorem eliminateRotation_decreases_totalLength
   sorry -- Proof: Each rotation position i eliminates at least one entry from
          -- q_i's list (p_{i+1}) and one from p_{i+1}'s list (q_i).
          -- Rotation has length ≥ 2, so at least 4 entries are removed.
-         -- No entries are added. Total length strictly decreases.
 
-/-- Find a rotation in the reduced table, if one exists.
-    A rotation exists iff some agent has list length ≥ 2. -/
+/-- Find a rotation in the reduced table, if one exists. -/
 noncomputable def findRotation (reduced : α → List α)
     (hdual : Phase1Duality reduced)
     (hsym : ReducedTableSymmetric reduced)
     (a : α) (ha : 2 ≤ (reduced a).length) : RotationCycle α := by
-  -- Follow the second→last chain starting from a.
-  -- This always closes into a cycle (finite agents, each step deterministic).
   exact Classical.choice (by
-    -- The chain p₀ = a, q₀ = second(a), p₁ = last(q₀), ...
-    -- visits finitely many agents, so must repeat.
-    -- The first repeat closes a rotation cycle.
     sorry)
 
-/-- Phase 2 iteration: eliminate rotations until termination.
-    Uses well-founded recursion on `totalLength`. -/
+/-- Phase 2 iteration: eliminate rotations until termination. -/
 noncomputable def phase2
     (reduced : α → List α)
     (prof : PreferenceProfile α)
@@ -321,21 +301,16 @@ noncomputable def phase2
       final a = [] ∧ ReducedTableSymmetric final ∧
       ReducedListCompatible final prof) := by
   sorry -- Proof: well-founded recursion on totalLength.
-         -- If all lists have length 1: return left.
-         -- If some list is empty: return right.
-         -- Otherwise: find rotation, eliminate, recurse.
-         -- Termination: eliminateRotation_decreases_totalLength.
-         -- Invariants: lemma2_rotation_elimination_preserves_invariants.
 
-/-! ## Part 4: Endpoint theorems -/
+/-! ## Endpoint theorems -/
 
-/-- **Stable pair invariant**: if a stable matching μ exists, then at every
-    stage of Phase 2, each agent's stable partner remains on their list. -/
-def StablePairInvariant (reduced : α → List α) (prof : PreferenceProfile α)
+/-- Stable-pair invariant: if μ is pairwise-stable, then at every Phase 2
+    stage, each agent's partner in μ remains on their list. -/
+def StablePairInvariant (reduced : α → List α) (_prof : PreferenceProfile α)
     (μ : Grouping α) : Prop :=
   ∀ a : α, pairPartner a (μ a) ∈ reduced a
 
-/-- Rotation elimination preserves the stable pair invariant. -/
+/-- Rotation elimination preserves the stable-pair invariant. -/
 theorem eliminateRotation_preserves_stablePair
     (reduced : α → List α) (prof : PreferenceProfile α) (μ : Grouping α)
     (c : RotationCycle α)
@@ -343,21 +318,17 @@ theorem eliminateRotation_preserves_stablePair
     (hrot : IsRotation c reduced)
     (hcompat : ReducedListCompatible reduced prof)
     (hsym : ReducedTableSymmetric reduced)
-    (hstable : CoreStable prof μ)
+    (hstable : PairwiseStable prof μ)
     (hvalid : IsValidGrouping μ)
     (hsize_μ : ∀ a : α, (μ a).card = 2)
     (hinv : StablePairInvariant reduced prof μ) :
     StablePairInvariant (eliminateRotation reduced c) prof μ := by
   sorry -- Proof: Suppose partner(μ, q_i) = p_{i+1} is eliminated at position i.
          -- Then q_i is matched to p_{i+1} in μ.
-         -- The rotation says q_i prefers p_i to p_{i+1} (rotation_eliminates_less_preferred).
-         -- p_i prefers q_{i-1} to q_i (second choice means q_i is not first).
-         -- But this means {q_i, p_i} could be a blocking pair unless p_i prefers
-         -- their current partner to q_i. Trace around the cycle to get a contradiction:
-         -- the cycle of preferences would require some pair to block μ.
+         -- The rotation says q_i prefers p_i to p_{i+1}.
+         -- Trace around the cycle to derive a blocking pair — contradiction.
 
-/-- **Singleton reduced table → stable matching.**
-    If all lists have length 1, the implied matching is core-stable. -/
+/-- **Singleton reduced table → pairwise-stable matching.** -/
 theorem reducedTable_singleton_stable
     (reduced : α → List α)
     (prof : PreferenceProfile α)
@@ -366,22 +337,13 @@ theorem reducedTable_singleton_stable
     (hcompat : ReducedListCompatible reduced prof)
     (hsym : ReducedTableSymmetric reduced)
     (hsingleton : AllSingleton reduced) :
-    CoreStable prof (singletonMatching reduced) := by
-  sorry -- Proof: The singleton matching is mutual (by symmetry + singleton).
-         -- Suppose {a, c} blocks. Then a prefers c to b = reduced(a)[0].
-         -- Since c ∉ reduced(a) (only b remains), c was eliminated.
-         -- By ReducedListCompatible through the elimination chain, every
-         -- eliminated partner is less preferred than the surviving one from
-         -- a's perspective at the time of elimination.
-         -- But a prefers c to b contradicts this (c would have survived).
-         -- More precisely: at the step c was removed from a's list, there was
-         -- a rotation where c was the "last" element. The rotation elimination
-         -- theorem shows c was strictly less preferred than the entry that
-         -- replaced it. Since b survived all eliminations, b ≥ c in preference.
-         -- Contradiction with a preferring c to b.
+    PairwiseStable prof (singletonMatching reduced) := by
+  sorry -- Proof: Singleton matching is mutual (symmetry + singleton).
+         -- Suppose {a, c} blocks. Then c was eliminated from a's list by
+         -- some rotation; that rotation's compatibility contradicts the
+         -- assumed preference.
 
-/-- **Empty list → no stable matching.**
-    If any agent's list becomes empty, no stable matching exists. -/
+/-- **Empty list → no pairwise-stable matching.** -/
 theorem reducedTable_empty_no_stable
     (reduced : α → List α)
     (prof : PreferenceProfile α)
@@ -390,30 +352,26 @@ theorem reducedTable_empty_no_stable
     (hcompat : ReducedListCompatible reduced prof)
     (hsym : ReducedTableSymmetric reduced)
     (a : α) (hempty : reduced a = []) :
-    ∀ μ : Grouping α, ¬ CoreStable prof μ := by
-  sorry -- Proof by contradiction: Suppose μ is core-stable.
-         -- Then StablePairInvariant holds initially (after Phase 1).
-         -- By eliminateRotation_preserves_stablePair, it holds at every step.
-         -- But at this step, reduced a = [], so partner(μ, a) ∉ reduced a.
-         -- Contradiction with StablePairInvariant.
+    ∀ μ : Grouping α, ¬ PairwiseStable prof μ := by
+  sorry -- Proof by contradiction: Suppose μ is pairwise-stable.
+         -- Then StablePairInvariant holds initially and through every step.
+         -- But reduced a = [], so partner(μ, a) ∉ reduced a. Contradiction.
 
-/-! ## Part 5: Main decidability theorem -/
+/-! ## Main decidability theorem -/
 
-/-- **Irving's algorithm decides stability.** Under size-2 preferences,
-    either a core-stable grouping exists or none does. -/
+/-- **Irving decides pairwise stability.** -/
 theorem irving_decides_stability
     (prof : PreferenceProfile α)
     (hsize : SizeTwo prof)
     (hvalid : IsValidProfile prof) :
-    (∃ μ : Grouping α, CoreStable prof μ) ∨
-    (∀ μ : Grouping α, ¬ CoreStable prof μ) := by
+    (∃ μ : Grouping α, PairwiseStable prof μ) ∨
+    (∀ μ : Grouping α, ¬ PairwiseStable prof μ) := by
   sorry -- Proof:
-         -- 1. Run Phase 1 → obtain reduced table (phase1_produces_reduced_table).
-         -- 2. If Phase 1 finds empty list → right (no stable matching).
-         -- 3. Run Phase 2 (phase2) → either AllSingleton or some-empty.
-         -- 4. AllSingleton → left (reducedTable_singleton_stable).
-         -- 5. some-empty → right (reducedTable_empty_no_stable).
+         -- 1. Run Phase 1 → obtain reduced table.
+         -- 2. Run Phase 2 → either AllSingleton or some-empty.
+         -- 3. AllSingleton → left (reducedTable_singleton_stable).
+         -- 4. some-empty → right (reducedTable_empty_no_stable).
 
 end
 
-end HedonicGrouping.Irving
+end HedonicGrouping.Algorithms.Irving
