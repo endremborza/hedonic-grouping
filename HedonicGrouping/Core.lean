@@ -50,14 +50,17 @@ def SizeTwo (prof : PreferenceProfile α) : Prop :=
 noncomputable def pairPartner (a : α) (G : Finset α) : α :=
   ((G.erase a).toList.head?.getD a)
 
+omit [Fintype α] in
 private lemma erase_nonempty_of_card_two {a : α} {G : Finset α}
     (ha : a ∈ G) (hcard : G.card = 2) : (G.erase a).Nonempty :=
   Finset.card_pos.mp (by rw [Finset.card_erase_of_mem ha, hcard]; omega)
 
+omit [Fintype α] in
 private lemma erase_toList_ne_nil {a : α} {G : Finset α}
     (ha : a ∈ G) (hcard : G.card = 2) : (G.erase a).toList ≠ [] :=
   Finset.Nonempty.toList_ne_nil (erase_nonempty_of_card_two ha hcard)
 
+omit [Fintype α] in
 lemma pairPartner_mem {a : α} {G : Finset α} (ha : a ∈ G) (hcard : G.card = 2) :
     pairPartner a G ∈ G := by
   unfold pairPartner
@@ -66,6 +69,7 @@ lemma pairPartner_mem {a : α} {G : Finset α} (ha : a ∈ G) (hcard : G.card = 
   have := List.head_mem hne
   exact Finset.mem_of_mem_erase (Finset.mem_toList.mp this)
 
+omit [Fintype α] in
 lemma pairPartner_ne {a : α} {G : Finset α} (ha : a ∈ G) (hcard : G.card = 2) :
     pairPartner a G ≠ a := by
   unfold pairPartner
