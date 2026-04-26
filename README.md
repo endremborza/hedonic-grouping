@@ -6,6 +6,12 @@ A single recursive algorithm subsumes both Gale-Shapley (bipartite matching) and
 
 The algorithm and its unification claim are original unpublished work. The Lean 4 formalization provides machine-checked proofs of correctness — unusual for the matching theory literature, where most results rely on pen-and-paper arguments.
 
+## Problems and algorithms
+
+Three problems: **SMP** (stable marriage), **RMP** (stable roommates), **HCP** (hedonic coalition formation). CAP (college admissions) is deferred to a later phase.
+
+Three algorithms: **GS** (Gale-Shapley), **IRV** (Irving), **HCF** (hedonic coalition formation — the novel algorithm). GS and IRV are proved correct directly on SMP and RMP. The unification (HCF subsumes GS/IRV; SMP/RMP embed in HCP) is a separate later layer — algorithms do not depend on that layer.
+
 ## Repository structure
 
 ```
@@ -28,8 +34,6 @@ refs/stable-marriage-lean/ reference GS formalization (0 sorries, ~1400 lines)
 src/                       Python reference implementations + tests
 scripts/concat_imports.py  topo-sort deps for AXLE
 tex/                       LaTeX paper
-plan.md                    structure, naming, roadmap
-CLAUDE.md                  LLM session configuration
 ```
 
 ## Formalization state
@@ -54,7 +58,16 @@ delegates. All claims pass `make disprove`.
 | `reducedTable_empty_no_stable` | Algorithms/Irving | ~100 |
 | `irving_decides_stability` | Algorithms/Irving | ~50 |
 
-See `plan.md` for resolution order.
+## Roadmap
+
+Phases are cumulative; each builds on the last.
+
+2. **GS on SMP — 0 sorries.** Close `gs_terminates`, `gs_invariants_hold`, `gs_pairwiseStable`. Reference: `refs/stable-marriage-lean/`.
+3. **IRV on RMP — 0 sorries.** Order: `eliminateRotation_decreases_totalLength`, `findRotation`, `phase2`, then `phase1_produces_reduced_table`, `eliminateRotation_preserves_stablePair`, `reducedTable_singleton_stable`, `reducedTable_empty_no_stable`, `irving_decides_stability`.
+4. **SMP ⊂ HCP, RMP ⊂ HCP.** Embedding lemmas plus `coreStable_iff_pairwiseStable`. Reframes GS/IRV correctness as HCP-level corollaries.
+5. **HCF on HCP.** Define and prove correct. Mirrors `src/hedonic.py`.
+6. **Trajectory bridges.** `HCF-on-SMP-instance ≡ GS`, `HCF-on-RMP-instance ≡ IRV`. The paper's punchline.
+7. **CAP.** Restore college-admissions infrastructure, define `IsCAP`, bridge.
 
 ## Development workflow
 
