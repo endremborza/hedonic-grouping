@@ -18,7 +18,6 @@ Three algorithms: **GS** (Gale-Shapley), **IRV** (Irving), **HCF** (hedonic coal
 HedonicGrouping/           Lean 4 formalization
   Core.lean                  shared types and pair utilities
   Problems/
-    Pairwise.lean              BlockingPair, PairwiseStable (shared SMP/RMP)
     SMP.lean                   BipartiteStructure, IsSMP
     RMP.lean                   IsRMP
     HCP.lean                   Considerable, CoreStable, IsHCP

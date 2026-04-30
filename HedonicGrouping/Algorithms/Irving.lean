@@ -1,6 +1,5 @@
 import Mathlib
 import HedonicGrouping.Core
-import HedonicGrouping.Problems.Pairwise
 
 namespace HedonicGrouping.Algorithms.Irving
 /-!
@@ -15,7 +14,6 @@ in `Correctness.IRV_RMP` via the `Unification` bridge.
 -/
 
 open HedonicGrouping.Core
-open HedonicGrouping.Problems.Pairwise
 
 variable {α : Type*} [DecidableEq α] [Fintype α]
 

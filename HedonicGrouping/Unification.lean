@@ -1,6 +1,5 @@
 import Mathlib
 import HedonicGrouping.Core
-import HedonicGrouping.Problems.Pairwise
 import HedonicGrouping.Problems.SMP
 import HedonicGrouping.Problems.HCP
 
@@ -25,7 +24,6 @@ Bridges between the three problem formulations and the three algorithms.
 -/
 
 open HedonicGrouping.Core
-open HedonicGrouping.Problems.Pairwise
 open HedonicGrouping.Problems.HCP
 
 variable {α : Type*} [DecidableEq α] [Fintype α]

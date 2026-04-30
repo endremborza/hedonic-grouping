@@ -8,8 +8,7 @@ Problem-agnostic types and utilities shared across every problem and
 algorithm: preference profiles, groupings, validity predicates, and
 size-2 pair helpers.
 
-Bipartite structure lives in `Problems.SMP`; pairwise stability lives in
-`Problems.Pairwise`; core stability and `Considerable` live in
+Bipartite structure lives in `Problems.SMP`; core stability and `Considerable` live in
 `Problems.HCP`.
 -/
 
@@ -84,5 +83,23 @@ lemma pairPartner_ne {a : α} {G : Finset α} (ha : a ∈ G) (hcard : G.card = 2
 /-- Agent `a` prefers partner `b` to partner `c`. -/
 def PrefersPartner (prof : PreferenceProfile α) (a b c : α) : Prop :=
   Ranks prof a {a, b} {a, c}
+
+/-!
+# Pairwise stability
+
+Stability as a pair phenomenon. Shared by SMP and RMP — both restrict to
+size-2 coalitions, where every deviation is a pair. The bridge to HCP's
+core stability under `SizeTwo` lives in `Unification`.
+-/
+
+/-- Blocking pair: both agents strictly prefer being together to their
+    current assignment. -/
+def BlockingPair (prof : PreferenceProfile α) (μ : Grouping α) (a b : α) : Prop :=
+  a ≠ b ∧ Ranks prof a {a, b} (μ a) ∧ Ranks prof b {a, b} (μ b)
+
+/-- No blocking pair exists. -/
+def PairwiseStable (prof : PreferenceProfile α) (μ : Grouping α) : Prop :=
+  ∀ a b : α, ¬ BlockingPair prof μ a b
+
 
 end HedonicGrouping.Core

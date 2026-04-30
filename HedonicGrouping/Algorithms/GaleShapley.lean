@@ -1,6 +1,5 @@
 import Mathlib
 import HedonicGrouping.Core
-import HedonicGrouping.Problems.Pairwise
 import HedonicGrouping.Problems.SMP
 
 namespace HedonicGrouping.Algorithms.GaleShapley
@@ -18,7 +17,6 @@ Deferred acceptance on a bipartite size-2 instance. Produces a
 -/
 
 open HedonicGrouping.Core
-open HedonicGrouping.Problems.Pairwise
 open HedonicGrouping.Problems.SMP
 
 variable {α : Type*} [DecidableEq α] [Fintype α]

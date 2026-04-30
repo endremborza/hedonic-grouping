@@ -1,6 +1,5 @@
 import Mathlib
 import HedonicGrouping.Core
-import HedonicGrouping.Problems.Pairwise
 import HedonicGrouping.Problems.RMP
 import HedonicGrouping.Problems.HCP
 import HedonicGrouping.Algorithms.Irving

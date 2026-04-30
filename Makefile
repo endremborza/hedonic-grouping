@@ -23,7 +23,6 @@ CONCAT   := python3 scripts/concat_imports.py
 # All leaf files to check. Add new files here as they appear.
 LEAF_FILES := \
     $(LEAN_DIR)/Core.lean \
-    $(LEAN_DIR)/Problems/Pairwise.lean \
     $(LEAN_DIR)/Problems/SMP.lean \
     $(LEAN_DIR)/Problems/RMP.lean \
     $(LEAN_DIR)/Problems/HCP.lean \

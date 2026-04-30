@@ -1,6 +1,5 @@
 import Mathlib
 import HedonicGrouping.Core
-import HedonicGrouping.Problems.Pairwise
 
 namespace HedonicGrouping.Problems.RMP
 /-!
