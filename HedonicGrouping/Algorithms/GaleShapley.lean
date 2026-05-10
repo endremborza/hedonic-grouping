@@ -59,8 +59,7 @@ def menPrefLE (prof : PreferenceProfile α) (m : α) (w1 w2 : α) : Prop :=
     (prof m)[i] = {m, w2} ∧ (prof m)[j] = {m, w1} ∧ j ≤ i
 
 /-- One GS step: a free man proposes to his best remaining candidate. -/
-def GSState.stepWith (bp : BipartiteStructure α) (prof : PreferenceProfile α)
-    (s : GSState α) (m w : α) : GSState α :=
+def GSState.stepWith (prof : PreferenceProfile α) (s : GSState α) (m w : α) : GSState α :=
   let proposed' := fun m' w' => s.proposed m' w' ∨ (m' = m ∧ w' = w)
   match s.matching w with
   | none =>
@@ -87,14 +86,13 @@ def GSState.stepWith (bp : BipartiteStructure α) (prof : PreferenceProfile α)
         proposed := proposed' }
 
 /-- Choose a free man and propose. -/
-def GSState.step (bp : BipartiteStructure α) (prof : PreferenceProfile α)
-    (s : GSState α) : GSState α :=
+def GSState.step (bp : BipartiteStructure α) (prof : PreferenceProfile α) (s : GSState α) : GSState α :=
   if h : ∃ m, GSFree bp prof s m then
     let m := Classical.choose h
     let _hm := Classical.choose_spec h
     let candidates := candidateReceivers bp prof s m
     if hc : candidates.Nonempty then
-      GSState.stepWith bp prof s m hc.choose
+      GSState.stepWith prof s m hc.choose
     else s
   else s
 
@@ -156,6 +154,7 @@ def ReceiverBest (bp : BipartiteStructure α) (prof : PreferenceProfile α)
 
 /-! ## Invariant initialization -/
 
+omit [Fintype α] [DecidableEq α] in
 lemma initial_matchConsistent : MatchConsistent (GSState.init : GSState α) := by
   intro a b
   simp [GSState.init]
@@ -197,19 +196,160 @@ lemma initial_receiverBest (bp : BipartiteStructure α)
 
 /-! ## Termination -/
 
-/-- Count of proposals made so far. -/
-noncomputable def proposalCount (bp : BipartiteStructure α)
-    (s : GSState α) : ℕ :=
-  (Finset.univ.filter fun mw : α × α =>
-    bp.isMen mw.1 = true ∧ bp.isMen mw.2 = false ∧ s.proposed mw.1 mw.2).card
+/-- The set of pairs `(m, w)` that have been proposed so far. -/
+def proposedSet (s : GSState α) : Finset (α × α) :=
+  Finset.univ.filter fun p => s.proposed p.1 p.2
+
+/-- Number of proposals made so far. -/
+def proposedCount (s : GSState α) : ℕ :=
+  (proposedSet s).card
+
+lemma mem_proposedSet (s : GSState α) (p : α × α) :
+    p ∈ proposedSet s ↔ s.proposed p.1 p.2 := by
+  simp [proposedSet]
+
+/-- After `stepWith`, the proposed relation is the old one extended by `(m, w)`. -/
+lemma stepWith_proposed (prof : PreferenceProfile α) (s : GSState α) (m w : α) :
+    (GSState.stepWith prof s m w).proposed =
+      fun m' w' => s.proposed m' w' ∨ (m' = m ∧ w' = w) := by
+  cases hw : s.matching w with
+  | none => simp [GSState.stepWith, hw]; split_ifs <;> rfl
+  | some mOld => simp [GSState.stepWith, hw]; split_ifs <;> rfl
+
+/-- `stepWith` inserts exactly `(m, w)` into the proposed set. -/
+lemma proposedSet_stepWith (prof : PreferenceProfile α) (s : GSState α) (m w : α) :
+    proposedSet (GSState.stepWith prof s m w) = insert (m, w) (proposedSet s) := by
+  ext ⟨m', w'⟩
+  simp [proposedSet, stepWith_proposed, or_comm]
+
+/-- If `(m, w)` is new, `stepWith` increases the count by one. -/
+lemma proposedCount_stepWith (prof : PreferenceProfile α) (s : GSState α) (m w : α)
+    (hnew : ¬ s.proposed m w) :
+    proposedCount (GSState.stepWith prof s m w) = proposedCount s + 1 := by
+  have hnotmem : (m, w) ∉ proposedSet s := by simp [proposedSet, hnew]
+  simp [proposedCount, proposedSet_stepWith, Finset.card_insert_of_notMem hnotmem]
+
+/-- The initial state has zero proposals. -/
+lemma proposedCount_initial : proposedCount (GSState.init : GSState α) = 0 := by
+  simp [proposedCount, proposedSet, GSState.init]
+
+/-- If a free man exists, stepping adds exactly one proposal. -/
+lemma proposedCount_step_of_free (bp : BipartiteStructure α) (prof : PreferenceProfile α)
+    (s : GSState α) (hfree : ∃ m, GSFree bp prof s m) :
+    proposedCount (s.step bp prof) = proposedCount s + 1 := by
+  simp only [GSState.step, hfree, dite_true]
+  set m := Classical.choose hfree with hm_def
+  set candidates := candidateReceivers bp prof s m with hcands_def
+  have hcands : candidates.Nonempty := by
+    obtain ⟨_, _, w, hw, hacc, hnprop⟩ := Classical.choose_spec hfree
+    exact ⟨w, by
+      simp only [hcands_def, candidateReceivers, Finset.mem_filter,
+                 Finset.mem_univ, true_and]
+      exact ⟨hw, hacc, hnprop⟩⟩
+  simp only [hcands, dite_true]
+  have hnew : ¬ s.proposed m hcands.choose := by
+    have hmem := hcands.choose_spec
+    simp only [hcands_def, candidateReceivers, Finset.mem_filter,
+               Finset.mem_univ, true_and] at hmem
+    exact hmem.2.2
+  exact proposedCount_stepWith prof s m hcands.choose hnew
+
+/-- All proposals go from men to women; so `proposedSet s` fits inside the men×women grid.
+    Proof: induction on the run — `step` only proposes when `GSFree` holds, which
+    requires `bp.isMen m = true` and `bp.isMen w = false`. -/
+lemma proposedSet_subset_menWomen (bp : BipartiteStructure α) (prof : PreferenceProfile α) (n : ℕ) :
+    proposedSet (GSState.run bp prof n) ⊆
+      (Finset.univ.filter (fun a => bp.isMen a = true)) ×ˢ
+      (Finset.univ.filter (fun a => bp.isMen a = false)) := by
+  induction n with
+    | zero => simp [GSState.run, proposedSet, GSState.init]
+    | succ n ih => 
+      simp only [GSState.run]
+      unfold GSState.step
+      split
+      next hFree => 
+        dsimp
+        split_ifs with hc
+        · rw [proposedSet_stepWith]
+          rw [Finset.insert_subset_iff]
+          constructor
+          · simp only [Finset.mem_product, Finset.mem_filter, Finset.mem_univ, true_and]
+            constructor
+            · obtain ⟨ hIsMan, hMatchedToNone, hExistsUnproposedWoman ⟩ := Classical.choose_spec hFree
+              exact hIsMan
+            · have hw := Exists.choose_spec hc
+              simp only [candidateReceivers, Finset.mem_filter, Finset.mem_univ, true_and] at hw
+              obtain ⟨hIsWoman, hValidCoalition, hNotProposed⟩ := hw
+              exact hIsWoman
+          · exact ih
+        · exact ih
+      · exact ih
+
+
+/-- The men×women grid has exactly `gsProposalBound bp` cells. -/
+lemma menWomen_card (bp : BipartiteStructure α) :
+    ((Finset.univ.filter (fun a => bp.isMen a = true)) ×ˢ
+     (Finset.univ.filter (fun a => bp.isMen a = false))).card = gsProposalBound bp := by
+  simp [gsProposalBound, Finset.card_product]
+
+/-- If a free man exists, the count is strictly below the proposal bound. -/
+lemma proposedCount_lt_bound_of_free (bp : BipartiteStructure α) (prof : PreferenceProfile α)
+    (n : ℕ) (hfree : ∃ m, GSFree bp prof (GSState.run bp prof n) m) :
+    proposedCount (GSState.run bp prof n) < gsProposalBound bp := by
+  obtain ⟨m, hismen, _, w, hw, _, hnprop⟩ := hfree
+  set s := GSState.run bp prof n with hs_def
+  set grid :=
+    (Finset.univ.filter (fun a => bp.isMen a = true)) ×ˢ
+    (Finset.univ.filter (fun a => bp.isMen a = false)) with hgrid_def
+  have hnotmem : (m, w) ∉ proposedSet s := by simp [proposedSet, hnprop]
+  have hmwinGrid : (m, w) ∈ grid := by simp [hgrid_def, hismen, hw]
+  have hsub : proposedSet s ⊆ grid := by rw [hs_def]; exact proposedSet_subset_menWomen bp prof n
+  have hssub : proposedSet s ⊂ grid := by
+    constructor
+    · exact hsub
+    · intro hge; exact hnotmem (hge hmwinGrid)
+  calc proposedCount s
+      = (proposedSet s).card := rfl
+    _ < grid.card := Finset.card_lt_card hssub
+    _ = gsProposalBound bp := menWomen_card bp
+
+/-- A terminated state is a fixpoint under `step`. -/
+lemma step_eq_of_terminated (bp : BipartiteStructure α) (prof : PreferenceProfile α)
+    (s : GSState α) (h : GSTerminated bp prof s) :
+    s.step bp prof = s := by
+  simp only [GSState.step, dif_neg h]
+
+/-- If not terminated at step `n`, exactly `n` proposals have been made. -/
+lemma proposedCount_run_of_not_terminated (bp : BipartiteStructure α)
+    (prof : PreferenceProfile α) (n : ℕ) :
+    ¬ GSTerminated bp prof (GSState.run bp prof n) →
+    proposedCount (GSState.run bp prof n) = n := by
+  induction n with
+  | zero =>
+    intro _; simp [GSState.run, proposedCount_initial]
+  | succ n ih =>
+    intro hnot
+    have hnot' : ¬ GSTerminated bp prof (GSState.run bp prof n) := fun hterm =>
+      hnot (show GSTerminated bp prof (GSState.run bp prof (n + 1)) by
+        simp only [GSState.run]; rwa [step_eq_of_terminated bp prof _ hterm])
+    have hfree : ∃ m, GSFree bp prof (GSState.run bp prof n) m :=
+      Classical.not_not.mp hnot'
+    calc proposedCount (GSState.run bp prof (n + 1))
+        = proposedCount ((GSState.run bp prof n).step bp prof) := rfl
+      _ = proposedCount (GSState.run bp prof n) + 1 :=
+          proposedCount_step_of_free bp prof _ hfree
+      _ = n + 1 := by rw [ih hnot']
 
 /-- The algorithm terminates within `gsProposalBound` steps. -/
 theorem gs_terminates (bp : BipartiteStructure α) (prof : PreferenceProfile α)
     (hvalid : IsValidProfile prof) (hsize : SizeTwo prof)
     (hbip : BipartitePref bp prof) :
     GSTerminated bp prof (GSState.run bp prof (gsProposalBound bp)) := by
-  sorry -- Proof: proposalCount strictly increases per step, bounded by gsProposalBound.
-         -- At the bound, no free man can exist (pigeonhole).
+  by_contra h
+  have heq := proposedCount_run_of_not_terminated bp prof _ h
+  have hfree : ∃ m, GSFree bp prof (GSState.run bp prof (gsProposalBound bp)) m :=
+    Classical.not_not.mp h
+  linarith [proposedCount_lt_bound_of_free bp prof _ hfree]
 
 /-! ## Invariant preservation -/
 
