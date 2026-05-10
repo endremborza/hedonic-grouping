@@ -274,10 +274,11 @@ lemma proposedSet_subset_menWomen (bp : BipartiteStructure α) (prof : Preferenc
           rw [Finset.insert_subset_iff]
           constructor
           · simp only [Finset.mem_product, Finset.mem_filter, Finset.mem_univ, true_and]
+            have hw := Classical.choose_spec hc
             constructor
             · obtain ⟨ hIsMan, hMatchedToNone, hExistsUnproposedWoman ⟩ := Classical.choose_spec hFree
               exact hIsMan
-            · have hw := Exists.choose_spec hc
+            · --
               simp only [candidateReceivers, Finset.mem_filter, Finset.mem_univ, true_and] at hw
               obtain ⟨hIsWoman, hValidCoalition, hNotProposed⟩ := hw
               exact hIsWoman
