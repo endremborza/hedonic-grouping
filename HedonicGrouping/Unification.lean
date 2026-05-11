@@ -1,6 +1,7 @@
 import Mathlib
 import HedonicGrouping.Core
 import HedonicGrouping.Problems.SMP
+import HedonicGrouping.Problems.RMP
 import HedonicGrouping.Problems.HCP
 
 namespace HedonicGrouping.Unification
@@ -9,24 +10,38 @@ namespace HedonicGrouping.Unification
 
 Bridges between the three problem formulations and the three algorithms.
 
-## Current contents (Phase 1)
+## Contents
 
 - Size-2 bridge: every blocking coalition is a pair, so `CoreStable` and
   `PairwiseStable` coincide under `SizeTwo`.
+- Problem-class containment: `IsSMP → IsHCP`, `IsRMP → IsHCP`. Composes
+  with HCF's existence theorem to give "HCF solves SMP / RMP".
 - GS ↔ HCP bridge: under size-2, `Considerable {a, b} a prop` collapses to
   `prop b = some {a, b}` — the GS proposal-acceptance predicate.
 
-## Later phases
-
-- Phase 4: `IsSMP prof → IsHCP prof`, `IsRMP prof → IsHCP prof` (problem
-  embeddings).
-- Phase 6: trajectory bridges (HCF on SMP ≡ GS, HCF on RMP ≡ IRV).
+Trajectory-level bridges (HCF output equals GS / Irving output) live in
+`Correctness/HCF_subsumes_{GS,IRV}.lean`.
 -/
 
 open HedonicGrouping.Core
+open HedonicGrouping.Problems.SMP
+open HedonicGrouping.Problems.RMP
 open HedonicGrouping.Problems.HCP
 
 variable {α : Type*} [DecidableEq α] [Fintype α]
+
+/-! ## Problem-class containment -/
+
+/-- Every SMP instance is an HCP instance. The valid-profile requirement
+    is the only HCP precondition; bipartiteness and size-2 are extra
+    structure SMP carries that HCP doesn't see. -/
+theorem isSMP_to_isHCP {prof : PreferenceProfile α} (h : IsSMP prof) : IsHCP prof :=
+  h.1
+
+/-- Every RMP instance is an HCP instance. Same reasoning — size-2 is
+    structure RMP carries that HCP doesn't see. -/
+theorem isRMP_to_isHCP {prof : PreferenceProfile α} (h : IsRMP prof) : IsHCP prof :=
+  h.1
 
 /-! ## Size-2 bridges -/
 

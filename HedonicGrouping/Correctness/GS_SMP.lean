@@ -25,7 +25,7 @@ variable {α : Type*} [DecidableEq α] [Fintype α]
 theorem gs_coreStable (bp : BipartiteStructure α) (prof : PreferenceProfile α)
     (hvalid : IsValidProfile prof) (hsize : SizeTwo prof)
     (hbip : BipartitePref bp prof) :
-    CoreStable prof (gsGrouping (GSState.run bp prof (gsProposalBound bp))) :=
+    CoreStable prof (gsGrouping (GSState.run bp prof (gsProposalBound α))) :=
   (coreStable_iff_pairwiseStable prof _ hsize).mpr
     (gs_pairwiseStable bp prof hvalid hsize hbip)
 
@@ -33,7 +33,7 @@ theorem gs_coreStable (bp : BipartiteStructure α) (prof : PreferenceProfile α)
 theorem gs_solves_smp (prof : PreferenceProfile α) (h : IsSMP prof) :
     ∃ μ : Grouping α, CoreStable prof μ := by
   obtain ⟨hvalid, hsize, bp, hbip⟩ := h
-  exact ⟨gsGrouping (GSState.run bp prof (gsProposalBound bp)),
+  exact ⟨gsGrouping (GSState.run bp prof (gsProposalBound α)),
     gs_coreStable bp prof hvalid hsize hbip⟩
 
 end HedonicGrouping.Correctness.GS_SMP
