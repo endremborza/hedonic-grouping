@@ -1,3 +1,5 @@
 /.lake
 *.pdf
 __pycache__
+refs
+.claude
