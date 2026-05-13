@@ -236,7 +236,8 @@ def solve_iterative(
         frame = stack[-1]
 
         if frame.stage is _Stage.INIT:
-            frame.problem.forced_moves.add(frame.exception)
+            if frame.exception:
+                frame.problem.forced_moves.add(frame.exception)
             frame.stage = _Stage.PHASE1
 
         if frame.stage is _Stage.PHASE1:
