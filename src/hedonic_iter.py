@@ -24,6 +24,12 @@ from functools import reduce
 from .common import Agent, Coalition, is_stable_hedonic
 
 
+class _Stage(Enum):
+    INIT = 0
+    PHASE1 = 1
+    AWAITING_CHILD = 2
+
+
 @dataclass
 class _Proposal:
     coalition: Coalition
@@ -70,6 +76,68 @@ class _Problem:
 
     def remaining_prefs(self, a: Agent) -> list[Coalition]:
         return [g for g in self.preferences[a] if g not in self.out_proposals[a]]
+
+
+@dataclass
+class _Frame:
+    problem: _Problem
+    exception: Coalition
+    stage: _Stage = _Stage.INIT
+    pending_remaining: list[Coalition] = field(default_factory=list)
+
+
+def solve(prefs: dict[Agent, list[Coalition]]) -> dict[Agent, Coalition] | None:
+    agents = list(prefs)
+    initial = _Problem.create(agents, prefs)
+    stack: list[_Frame] = [_Frame(problem=initial, exception=frozenset())]
+    last: _Problem | None = None
+
+    while stack:
+        frame = stack[-1]
+
+        if frame.stage is _Stage.INIT:
+            frame.problem.forced_moves.add(frame.exception)
+            frame.stage = _Stage.PHASE1
+
+        if frame.stage is _Stage.PHASE1:
+            if not _phase1(frame.problem):
+                stack.pop()
+                last = None
+                continue
+
+            sol = frame.problem.solution()
+            if sol is not None and is_stable_hedonic(prefs, sol):
+                for a in frame.problem.agents:
+                    frame.problem.preferences[a] = [sol[a]]
+                stack.pop()
+                last = frame.problem
+                continue
+
+            pivot: Agent | None = None
+            for a in frame.problem.agents:
+                if frame.problem.remaining_prefs(a):
+                    pivot = a
+                    break
+
+            if pivot is None:
+                stack.pop()
+                last = frame.problem
+                continue
+
+            frame.pending_remaining = frame.problem.remaining_prefs(pivot)
+            k = frame.problem.out_proposals[pivot][-1]
+            stack.append(_Frame(problem=deepcopy(frame.problem), exception=k))
+            frame.stage = _Stage.AWAITING_CHILD
+            continue
+
+        if frame.stage is _Stage.AWAITING_CHILD:
+            if last is None:
+                _eliminate(frame.problem, frame.pending_remaining)
+                frame.stage = _Stage.PHASE1
+                continue
+            stack.pop()
+
+    return last.solution() if last is not None else None
 
 
 def _eliminate(problem: _Problem, coalitions: list[Coalition]) -> None:
@@ -136,71 +204,3 @@ def _phase1(problem: _Problem) -> bool:
             for b in top - {a}:
                 _receive_proposal(problem, b, top, a)
     return True
-
-
-class _Stage(Enum):
-    INIT = 0
-    PHASE1 = 1
-    AWAITING_CHILD = 2
-
-
-@dataclass
-class _Frame:
-    problem: _Problem
-    exception: Coalition
-    stage: _Stage = _Stage.INIT
-    pending_remaining: list[Coalition] = field(default_factory=list)
-
-
-def solve(prefs: dict[Agent, list[Coalition]]) -> dict[Agent, Coalition] | None:
-    agents = list(prefs)
-    initial = _Problem.create(agents, prefs)
-    stack: list[_Frame] = [_Frame(problem=initial, exception=frozenset())]
-    last: _Problem | None = None
-
-    while stack:
-        frame = stack[-1]
-
-        if frame.stage is _Stage.INIT:
-            frame.problem.forced_moves.add(frame.exception)
-            frame.stage = _Stage.PHASE1
-
-        if frame.stage is _Stage.PHASE1:
-            if not _phase1(frame.problem):
-                stack.pop()
-                last = None
-                continue
-
-            sol = frame.problem.solution()
-            if sol is not None and is_stable_hedonic(prefs, sol):
-                for a in frame.problem.agents:
-                    frame.problem.preferences[a] = [sol[a]]
-                stack.pop()
-                last = frame.problem
-                continue
-
-            pivot: Agent | None = None
-            for a in frame.problem.agents:
-                if frame.problem.remaining_prefs(a):
-                    pivot = a
-                    break
-
-            if pivot is None:
-                stack.pop()
-                last = frame.problem
-                continue
-
-            frame.pending_remaining = frame.problem.remaining_prefs(pivot)
-            k = frame.problem.out_proposals[pivot][-1]
-            stack.append(_Frame(problem=deepcopy(frame.problem), exception=k))
-            frame.stage = _Stage.AWAITING_CHILD
-            continue
-
-        if frame.stage is _Stage.AWAITING_CHILD:
-            if last is None:
-                _eliminate(frame.problem, frame.pending_remaining)
-                frame.stage = _Stage.PHASE1
-                continue
-            stack.pop()
-
-    return last.solution() if last is not None else None
