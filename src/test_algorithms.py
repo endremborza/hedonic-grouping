@@ -17,6 +17,7 @@ from .common import (
 )
 from .gale_shapley import gale_shapley
 from .hedonic import solve as hedonic_solve
+from .hedonic_iter import solve as hedonic_iter_solve
 from .irving import irving
 
 
@@ -108,44 +109,45 @@ def test_irving_monte_carlo() -> None:
 
 # --- Hedonic ---
 
+EXAMPLE5_PREFS: dict[str, list[Coalition]] = {
+    "a1": [
+        frozenset({"a1", "a4"}),
+        frozenset({"a1", "a2", "a4"}),
+        frozenset({"a1", "a3"}),
+        frozenset({"a1", "a2", "a5"}),
+        frozenset({"a1", "a2"}),
+    ],
+    "a2": [
+        frozenset({"a2", "a1", "a5"}),
+        frozenset({"a2", "a1", "a4"}),
+        frozenset({"a2", "a1"}),
+        frozenset({"a2", "a3"}),
+    ],
+    "a3": [
+        frozenset({"a3", "a5"}),
+        frozenset({"a3", "a1"}),
+        frozenset({"a3", "a2"}),
+        frozenset({"a3", "a4"}),
+    ],
+    "a4": [
+        frozenset({"a4", "a3"}),
+        frozenset({"a4", "a1", "a2"}),
+        frozenset({"a4", "a1"}),
+        frozenset({"a4", "a5"}),
+    ],
+    "a5": [
+        frozenset({"a5", "a4"}),
+        frozenset({"a5", "a1", "a2"}),
+        frozenset({"a5", "a3"}),
+    ],
+}
+
 
 def test_hedonic_example5() -> None:
     """Example 5 from the paper (5 agents, mixed coalition sizes)."""
-    prefs: dict[str, list[Coalition]] = {
-        "a1": [
-            frozenset({"a1", "a4"}),
-            frozenset({"a1", "a2", "a4"}),
-            frozenset({"a1", "a3"}),
-            frozenset({"a1", "a2", "a5"}),
-            frozenset({"a1", "a2"}),
-        ],
-        "a2": [
-            frozenset({"a2", "a1", "a5"}),
-            frozenset({"a2", "a1", "a4"}),
-            frozenset({"a2", "a1"}),
-            frozenset({"a2", "a3"}),
-        ],
-        "a3": [
-            frozenset({"a3", "a5"}),
-            frozenset({"a3", "a1"}),
-            frozenset({"a3", "a2"}),
-            frozenset({"a3", "a4"}),
-        ],
-        "a4": [
-            frozenset({"a4", "a3"}),
-            frozenset({"a4", "a1", "a2"}),
-            frozenset({"a4", "a1"}),
-            frozenset({"a4", "a5"}),
-        ],
-        "a5": [
-            frozenset({"a5", "a4"}),
-            frozenset({"a5", "a1", "a2"}),
-            frozenset({"a5", "a3"}),
-        ],
-    }
-    solution = hedonic_solve(prefs)
+    solution = hedonic_solve(EXAMPLE5_PREFS)
     assert solution is not None
-    assert is_stable_hedonic(prefs, solution)
+    assert is_stable_hedonic(EXAMPLE5_PREFS, solution)
 
 
 def test_hedonic_monte_carlo() -> None:
@@ -160,6 +162,37 @@ def test_hedonic_monte_carlo() -> None:
             print(f"  FAILURE at seed {seed}")
     print(f"  Hedonic MC: {samples - failures}/{samples} stable")
     assert failures == 0
+
+
+# --- Iterative HCF: parity with recursive HCF ---
+
+
+def test_hedonic_iter_example5() -> None:
+    """Iterative HCF solves Example 5."""
+    solution = hedonic_iter_solve(EXAMPLE5_PREFS)
+    assert solution is not None
+    assert is_stable_hedonic(EXAMPLE5_PREFS, solution)
+
+
+def test_hedonic_iter_parity_monte_carlo() -> None:
+    """Iterative and recursive HCF agree on solvability for every instance."""
+    n, samples = 6, 200
+    mismatches = 0
+    for seed in range(samples):
+        _, prefs = generate_hedonic(n, seed)
+        rec = hedonic_solve(prefs)
+        itr = hedonic_iter_solve(prefs)
+        if (rec is None) != (itr is None):
+            mismatches += 1
+            print(
+                f"  SOLVABILITY MISMATCH at seed {seed}: "
+                f"rec={rec is not None}, iter={itr is not None}"
+            )
+            continue
+        if itr is not None:
+            assert is_stable_hedonic(prefs, itr), f"iter unstable at seed {seed}"
+    print(f"  Iter parity: {samples - mismatches}/{samples} matched")
+    assert mismatches == 0
 
 
 # --- Cross-validation ---
@@ -298,6 +331,8 @@ ALL_TESTS = [
     test_irving_monte_carlo,
     test_hedonic_example5,
     test_hedonic_monte_carlo,
+    test_hedonic_iter_example5,
+    test_hedonic_iter_parity_monte_carlo,
     test_cross_marriage_hedonic,
     test_cross_roommates_hedonic,
     test_college_admissions,
