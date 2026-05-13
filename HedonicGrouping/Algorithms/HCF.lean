@@ -8,7 +8,7 @@ namespace HedonicGrouping.Algorithms.HCF
 
 Iterative reformulation of the recursive HCF: the Python prototype's
 recursive call stack becomes an explicit `List HCFFrame`. Each `step`
-performs one atomic action. Mirrors `src/hedonic_iter.py`.
+performs one atomic action. Mirrors `src/hedonic.py::solve_iterative`.
 
 Termination measure (for the eventual proof): `(|stack|, totalRemainingPrefs)`
 decreases lexicographically — `eliminate` strictly shrinks the second
