@@ -28,13 +28,17 @@ LEAF_FILES := \
     $(LEAN_DIR)/Problems/HCP.lean \
     $(LEAN_DIR)/Algorithms/GaleShapley.lean \
     $(LEAN_DIR)/Algorithms/Irving.lean \
+    $(LEAN_DIR)/Algorithms/HCF.lean \
     $(LEAN_DIR)/Unification.lean \
     $(LEAN_DIR)/Correctness/GS_SMP.lean \
     $(LEAN_DIR)/Correctness/IRV_RMP.lean \
+    $(LEAN_DIR)/Correctness/HCF_HCP.lean \
+    $(LEAN_DIR)/Correctness/HCF_subsumes_GS.lean \
+    $(LEAN_DIR)/Correctness/HCF_subsumes_IRV.lean \
     $(LEAN_DIR)/Summary.lean
 
 # Default target file for repair/sorry2lemma when FILE is not specified.
-FILE ?= $(LEAN_DIR)/Algorithms/Irving.lean
+FILE ?= $(LEAN_DIR)/Algorithms/GaleShapley.lean
 
 # Output directory for extract-theorems.
 EXTRACT_DIR ?= $(LEAN_DIR)/extracted

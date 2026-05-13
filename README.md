@@ -1,78 +1,76 @@
 # Hedonic Grouping
 
-Lean 4 formalization of a unifying algorithm for stable matching as hedonic coalition formation.
+Lean 4 formalization of a unifying algorithm for stable matching as
+hedonic coalition formation.
 
-A single recursive algorithm subsumes both Gale-Shapley (bipartite matching) and Irving (stable roommates) as special cases, applied to general hedonic games with strict preferences over arbitrary coalitions. The algorithm is correct and complete but worst-case exponential — inherent since the general problem is NP-hard (Ballester 2004). It reduces to polynomial-time on tractable subclasses.
+A single recursive algorithm (Hedonic Coalition Formation, HCF) subsumes
+both Gale-Shapley (bipartite matching) and Irving (stable roommates) as
+special cases, applied to general hedonic games with strict preferences
+over arbitrary coalitions. The algorithm is correct and complete but
+worst-case exponential — inherent since the general problem is NP-hard
+(Ballester 2004). It reduces to polynomial time on tractable subclasses.
 
-The algorithm and its unification claim are original unpublished work. The Lean 4 formalization provides machine-checked proofs of correctness — unusual for the matching theory literature, where most results rely on pen-and-paper arguments.
+The algorithm and its unification claim are original unpublished work.
+The Lean 4 formalization provides machine-checked proofs of correctness
+— unusual for the matching theory literature, where most results rely
+on pen-and-paper arguments.
 
 ## Problems and algorithms
 
-Three problems: **SMP** (stable marriage), **RMP** (stable roommates), **HCP** (hedonic coalition formation). CAP (college admissions) is deferred to a later phase.
+Three problems: **SMP** (stable marriage), **RMP** (stable roommates),
+**HCP** (hedonic coalition formation). CAP (college admissions) is
+deferred.
 
-Three algorithms: **GS** (Gale-Shapley), **IRV** (Irving), **HCF** (hedonic coalition formation — the novel algorithm). GS and IRV are proved correct directly on SMP and RMP. The unification (HCF subsumes GS/IRV; SMP/RMP embed in HCP) is a separate later layer — algorithms do not depend on that layer.
+Three algorithms: **GS** (Gale-Shapley), **IRV** (Irving), **HCF**. GS
+and IRV are proved correct on SMP and RMP directly. The unification
+(HCF subsumes GS/IRV; SMP/RMP embed in HCP) is a separate layer in
+`Correctness/` — algorithms do not depend on it.
 
 ## Repository structure
 
 ```
-HedonicGrouping/           Lean 4 formalization
-  Core.lean                  shared types and pair utilities
+HedonicGrouping/
+  Core.lean                          shared types and pair utilities
   Problems/
-    SMP.lean                   BipartiteStructure, IsSMP
-    RMP.lean                   IsRMP
-    HCP.lean                   Considerable, CoreStable, IsHCP
+    SMP.lean                         BipartiteStructure, IsSMP
+    RMP.lean                         IsRMP
+    HCP.lean                         Considerable, CoreStable, IsHCP
   Algorithms/
-    GaleShapley.lean           GS state, step, run, invariants — 3 sorries
-    Irving.lean                IRV phase 1, phase 2, rotations — 8 sorries
+    GaleShapley.lean                 GS state, step, run, invariants
+    Irving.lean                      IRV phase 1, phase 2, rotations
+    HCF.lean                         HCF iterative form, frames, step
   Correctness/
-    GS_SMP.lean                gs_solves_smp
-    IRV_RMP.lean               irving_decides_rmp
-  Unification.lean           size-2 and Considerable↔GS bridges
-  Summary.lean               top-level re-exports
-refs/stable-marriage-lean/ reference GS formalization (0 sorries, ~1400 lines)
-src/                       Python reference implementations + tests
-scripts/concat_imports.py  topo-sort deps for AXLE
-tex/                       LaTeX paper
+    GS_SMP.lean                      gs_solves_smp (via size-2 bridge)
+    IRV_RMP.lean                     irving_decides_rmp (via size-2 bridge)
+    HCF_HCP.lean                     hcf_solves_{hcp,smp,rmp}
+    HCF_subsumes_GS.lean             trajectory-equivalence stub
+    HCF_subsumes_IRV.lean            trajectory-equivalence stub
+  Unification.lean                   size-2 bridges, isSMP/RMP_to_isHCP
+  Summary.lean                       top-level re-exports
+refs/stable-marriage-lean/           reference GS formalization (0 sorries)
+src/                                 Python reference implementations + tests
+tex/                                 LaTeX paper
 ```
 
 ## Formalization state
 
-**11 sorries remain, all in `Algorithms/GaleShapley.lean` and
-`Algorithms/Irving.lean`.** Everything else is proven or trivially
-delegates. All claims pass `make disprove`.
+**26 sorries across 5 files.** All claims pass `make disprove` (no
+counterexamples found within the timeout).
 
-### Remaining sorries
-
-| Sorry | File | Est. lines |
-|-------|------|-----------|
-| `eliminateRotation_decreases_totalLength` | Algorithms/Irving | ~50 |
-| `gs_terminates` | Algorithms/GaleShapley | ~80 |
-| `findRotation` | Algorithms/Irving | ~80 |
-| `phase2` | Algorithms/Irving | ~50 |
-| `gs_invariants_hold` | Algorithms/GaleShapley | ~600 |
-| `gs_pairwiseStable` | Algorithms/GaleShapley | ~100 |
-| `phase1_produces_reduced_table` | Algorithms/Irving | ~300 |
-| `eliminateRotation_preserves_stablePair` | Algorithms/Irving | ~150 |
-| `reducedTable_singleton_stable` | Algorithms/Irving | ~150 |
-| `reducedTable_empty_no_stable` | Algorithms/Irving | ~100 |
-| `irving_decides_stability` | Algorithms/Irving | ~50 |
-
-## Roadmap
-
-Phases are cumulative; each builds on the last.
-
-2. **GS on SMP — 0 sorries.** Close `gs_terminates`, `gs_invariants_hold`, `gs_pairwiseStable`. Reference: `refs/stable-marriage-lean/`.
-3. **IRV on RMP — 0 sorries.** Order: `eliminateRotation_decreases_totalLength`, `findRotation`, `phase2`, then `phase1_produces_reduced_table`, `eliminateRotation_preserves_stablePair`, `reducedTable_singleton_stable`, `reducedTable_empty_no_stable`, `irving_decides_stability`.
-4. **SMP ⊂ HCP, RMP ⊂ HCP.** Embedding lemmas plus `coreStable_iff_pairwiseStable`. Reframes GS/IRV correctness as HCP-level corollaries.
-5. **HCF on HCP.** Define and prove correct. Mirrors `src/hedonic.py`.
-6. **Trajectory bridges.** `HCF-on-SMP-instance ≡ GS`, `HCF-on-RMP-instance ≡ IRV`. The paper's punchline.
-7. **CAP.** Restore college-admissions infrastructure, define `IsCAP`, bridge.
+| File | Sorries | Notes |
+|---|---:|---|
+| `Algorithms/GaleShapley.lean` | 15 | 7 `stepWith_*` + 7 `runSteps_*` + `gs_pairwiseStable` |
+| `Algorithms/Irving.lean` | 8 | Phase 1, Phase 2, endpoint theorems |
+| `Algorithms/HCF.lean` | 1 | `hcf_coreStable`; blocked on HCF definitions |
+| `Correctness/HCF_subsumes_GS.lean` | 1 | Optional trajectory-equivalence claim |
+| `Correctness/HCF_subsumes_IRV.lean` | 1 | Optional trajectory-equivalence claim |
 
 ## Development workflow
 
-Lean checking via AXLE (remote Lean 4.28.0 + Mathlib). Per-file checks
-concatenate each target with its dependencies via
-`scripts/concat_imports.py` — AXLE only accepts `import Mathlib`.
+Lean checking goes through AXLE (axiommath.ai, remote Lean 4.28.0 +
+Mathlib). Per-file checks concatenate each target with its
+`HedonicGrouping.*` dependencies via `scripts/concat_imports.py` —
+AXLE only accepts `import Mathlib`.
 
 ```bash
 make check                                  # type-check every leaf file
@@ -82,17 +80,22 @@ make sorry2lemma FILE=... NAMES=...         # extract sorry goals as stubs
 make repair FILE=... NAMES=...              # auto-repair attempts
 ```
 
-Python tests (11/11 passing):
+Python tests:
+
 ```bash
 python -m src.test_algorithms
 ```
 
+Uses the `.venv` in this directory (managed by `uv`).
+
 ## Python implementations
 
-Reference implementations with stability verification and Monte Carlo testing:
+Reference implementations with stability verification and Monte Carlo
+testing:
 
 - `src/common.py` — types, stability verifiers, random generators
 - `src/gale_shapley.py` — Gale-Shapley for stable marriage
 - `src/irving.py` — Irving's algorithm for stable roommates
-- `src/hedonic.py` — general hedonic grouping
-- `src/test_algorithms.py` — all tests including cross-algorithm stability checks
+- `src/hedonic.py` — general hedonic grouping (recursive + iterative)
+- `src/test_algorithms.py` — all tests including cross-algorithm
+  stability checks
