@@ -17,7 +17,7 @@ from .common import (
 )
 from .gale_shapley import gale_shapley
 from .hedonic import solve as hedonic_solve
-from .hedonic_iter import solve as hedonic_iter_solve
+from .hedonic import solve_iterative as hedonic_iter_solve
 from .irving import irving
 
 
