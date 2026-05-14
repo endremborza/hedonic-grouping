@@ -52,7 +52,7 @@ EXTRACT_DIR ?= $(LEAN_DIR)/extracted
 all: check
 
 python-check:
-	python -m src.test_algorithms
+	.venv/bin/pytest
 
 check:
 	@set -e; for f in $(LEAF_FILES); do \
