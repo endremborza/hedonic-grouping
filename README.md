@@ -80,22 +80,23 @@ make sorry2lemma FILE=... NAMES=...         # extract sorry goals as stubs
 make repair FILE=... NAMES=...              # auto-repair attempts
 ```
 
-Python tests:
+Python tests (pytest, `.venv` managed by `uv`):
 
 ```bash
-python -m src.test_algorithms
+.venv/bin/pytest         # or `make python-check`
 ```
-
-Uses the `.venv` in this directory (managed by `uv`).
 
 ## Python implementations
 
-Reference implementations with stability verification and Monte Carlo
-testing:
+Reference implementations exercised by a pytest suite. The
+preference generator drives most of the coverage — exhaustive at
+small n, random samples above.
 
-- `src/common.py` — types, stability verifiers, random generators
+- `src/common.py` — types and stability verifiers
+- `src/generators.py` — SMP/RMP/HCP preference generators
+  (`random_*`, `enumerate_*`, cap-aware `profiles_*`)
 - `src/gale_shapley.py` — Gale-Shapley for stable marriage
 - `src/irving.py` — Irving's algorithm for stable roommates
 - `src/hedonic.py` — general hedonic grouping (recursive + iterative)
-- `src/test_algorithms.py` — all tests including cross-algorithm
-  stability checks
+- `src/tests/` — pytest suite: edge-case fixtures plus generated
+  coverage per algorithm and cross-algorithm checks
