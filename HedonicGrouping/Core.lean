@@ -34,6 +34,31 @@ def IsAdmissibleCoalition (a : α) (G : Finset α) : Prop :=
 def IsValidProfile (prof : PreferenceProfile α) : Prop :=
   ∀ a : α, (prof a).Nodup ∧ ∀ G ∈ prof a, IsAdmissibleCoalition a G
 
+omit [Fintype α] [DecidableEq α] in
+lemma Ranks_trans (prof : PreferenceProfile α) (hvalid : IsValidProfile prof) (a : α)
+    {G H K : Finset α} (h1 : Ranks prof a G H) (h2 : Ranks prof a H K) :
+    Ranks prof a G K := by
+  obtain ⟨i, j, hij, hGi, hHj⟩ := h1
+  obtain ⟨i', j', hi'j', hHi', hKj'⟩ := h2
+  refine ⟨i, j', ?_, hGi, hKj'⟩
+  have hnodup := (hvalid a).1
+  have heq : (prof a)[j.val] = (prof a)[i'.val] := hHj.trans hHi'.symm
+  have hjj' : j.val = i'.val := (List.Nodup.getElem_inj_iff hnodup).mp heq
+  have h1' : i.val < j.val := hij
+  have h2' : i'.val < j'.val := hi'j'
+  show i.val < j'.val
+  omega
+
+omit [Fintype α] [DecidableEq α] in
+lemma Ranks_irrefl (prof : PreferenceProfile α) (hvalid : IsValidProfile prof)
+    (a : α) (G : Finset α) : ¬ Ranks prof a G G := by
+  rintro ⟨i, j, hij, hGi, hGj⟩
+  have hnodup := (hvalid a).1
+  have heq : (prof a)[i.val] = (prof a)[j.val] := hGi.trans hGj.symm
+  have hij_eq : i.val = j.val := (List.Nodup.getElem_inj_iff hnodup).mp heq
+  have hij_lt : i.val < j.val := hij
+  omega
+
 /-- Every agent belongs to their assigned coalition. -/
 def IsValidGrouping (μ : Grouping α) : Prop :=
   ∀ a : α, a ∈ μ a

@@ -27,7 +27,7 @@ theorem gs_coreStable (bp : BipartiteStructure α) (prof : PreferenceProfile α)
     (hbip : BipartitePref bp prof) :
     CoreStable prof (gsGrouping (GSState.run bp prof (gsProposalBound α))) :=
   (coreStable_iff_pairwiseStable prof _ hsize).mpr
-    (gs_pairwiseStable bp prof hvalid hsize hbip)
+    (gs_pairwiseStable bp prof hvalid hbip)
 
 /-- **GS produces a core-stable grouping for every SMP instance.** -/
 theorem gs_solves_smp (prof : PreferenceProfile α) (h : IsSMP prof) :
