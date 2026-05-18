@@ -54,12 +54,12 @@ tex/                                 LaTeX paper
 
 ## Formalization state
 
-**11 sorries across 4 files.** All claims pass `make disprove` (no
+**10 sorries across 4 files.** All claims pass `make disprove` (no
 counterexamples found within the timeout).
 
 | File | Sorries | Notes |
 |---|---:|---|
-| `Algorithms/Irving.lean` | 8 | Phase 1, Phase 2, endpoint theorems |
+| `Algorithms/Irving.lean` | 7 | Phase 1, Phase 2, endpoint theorems |
 | `Algorithms/HCF.lean` | 1 | `hcf_coreStable`; blocked on HCF definitions |
 | `Correctness/HCF_subsumes_GS.lean` | 1 | Optional trajectory-equivalence claim |
 | `Correctness/HCF_subsumes_IRV.lean` | 1 | Optional trajectory-equivalence claim |

@@ -267,23 +267,82 @@ theorem phase1_produces_reduced_table
 
 /-! ## Phase 2 — iterated rotation elimination -/
 
-/-- Rotation elimination strictly decreases total list lengths. -/
+/-- Rotation elimination strictly decreases total list lengths. Witnessed by
+    rotation position 0: `p_next = (c.pairs.get 1).1` is the last element of
+    `reduced q_0`, and it is included in the removal list computed for
+    agent `q_0`. So `(reduced q_0).filter` is a strict sublist of `reduced q_0`,
+    and the sum over all agents drops by at least one. -/
 theorem eliminateRotation_decreases_totalLength
     (reduced : α → List α)
     (c : RotationCycle α)
     (hrot : IsRotation c reduced) :
     totalLength (eliminateRotation reduced c) < totalLength reduced := by
-  sorry -- Proof: Each rotation position i eliminates at least one entry from
-         -- q_i's list (p_{i+1}) and one from p_{i+1}'s list (q_i).
-         -- Rotation has length ≥ 2, so at least 4 entries are removed.
+  classical
+  have h0 : 0 < c.pairs.length := c.length_pos
+  obtain ⟨_, hlast, hne, _⟩ := hrot ⟨0, h0⟩
+  set q : α := (c.pairs.get ⟨0, h0⟩).2 with hq_def
+  set p_next : α :=
+    (c.pairs.get (nextFin (⟨0, h0⟩ : Fin c.pairs.length) c.length_pos)).1 with hp_def
+  have hp_mem : p_next ∈ reduced q := by
+    have h := hlast
+    rw [List.getLastD_eq_getLast?, List.getLast?_eq_some_getLast hne,
+        Option.getD_some] at h
+    rw [← h]
+    exact List.getLast_mem hne
+  set rem : List α := (List.finRange c.pairs.length).filterMap (fun i =>
+      if q = (c.pairs.get i).2 then
+        some (c.pairs.get (nextFin i c.length_pos)).1
+      else if q = (c.pairs.get (nextFin i c.length_pos)).1 then
+        some (c.pairs.get i).2
+      else none) with hrem_def
+  have hp_in_rem : p_next ∈ rem := by
+    rw [hrem_def, List.mem_filterMap]
+    refine ⟨⟨0, h0⟩, List.mem_finRange _, ?_⟩
+    show (if q = (c.pairs.get (⟨0, h0⟩ : Fin c.pairs.length)).2 then
+            some (c.pairs.get (nextFin (⟨0, h0⟩ : Fin c.pairs.length) c.length_pos)).1
+          else if q = (c.pairs.get (nextFin (⟨0, h0⟩ : Fin c.pairs.length) c.length_pos)).1 then
+            some (c.pairs.get (⟨0, h0⟩ : Fin c.pairs.length)).2
+          else none) = some p_next
+    rw [if_pos rfl]
+  have heq_q : (eliminateRotation reduced c) q =
+      (reduced q).filter (fun x => decide (x ∉ rem)) := rfl
+  have h_strict : ((eliminateRotation reduced c) q).length < (reduced q).length := by
+    rw [heq_q]
+    have hsub : List.Sublist
+        ((reduced q).filter (fun x => decide (x ∉ rem))) (reduced q) :=
+      List.filter_sublist
+    rcases lt_or_eq_of_le hsub.length_le with hlt | heq
+    · exact hlt
+    · exfalso
+      have hfilt_eq := List.Sublist.eq_of_length hsub heq
+      have hpfilt : p_next ∈ (reduced q).filter (fun x => decide (x ∉ rem)) := by
+        rw [hfilt_eq]; exact hp_mem
+      rw [List.mem_filter] at hpfilt
+      have : p_next ∉ rem := by
+        have := hpfilt.2
+        simpa using this
+      exact this hp_in_rem
+  have h_le : ∀ a, ((eliminateRotation reduced c) a).length ≤ (reduced a).length := by
+    intro a
+    show ((reduced a).filter _).length ≤ _
+    exact List.filter_sublist.length_le
+  unfold totalLength
+  exact Finset.sum_lt_sum (fun a _ => h_le a) ⟨q, Finset.mem_univ _, h_strict⟩
 
-/-- Find a rotation in the reduced table, if one exists. -/
+/-- Find a rotation in the reduced table. The return type packages the
+    cycle with its `IsRotation` witness — the prior signature returned an
+    unconstrained `RotationCycle α`, which is trivially inhabited from any
+    element of `α` and so did not bind the result to be a real rotation.
+
+    The construction (left as a sorry) iterates
+    `p ↦ last(reduced (second(reduced p)))` from `p_0 := a`; finiteness of
+    `α` forces a cycle, which is the rotation. -/
 noncomputable def findRotation (reduced : α → List α)
     (hdual : Phase1Duality reduced)
     (hsym : ReducedTableSymmetric reduced)
-    (a : α) (ha : 2 ≤ (reduced a).length) : RotationCycle α := by
-  exact Classical.choice (by
-    sorry)
+    (a : α) (ha : 2 ≤ (reduced a).length) :
+    { c : RotationCycle α // IsRotation c reduced } := by
+  sorry
 
 /-- Phase 2 iteration: eliminate rotations until termination. -/
 noncomputable def phase2
