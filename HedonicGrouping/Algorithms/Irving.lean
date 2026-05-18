@@ -496,11 +496,20 @@ theorem irving_decides_stability
     (hvalid : IsValidProfile prof) :
     (∃ μ : Grouping α, PairwiseStable prof μ) ∨
     (∀ μ : Grouping α, ¬ PairwiseStable prof μ) := by
-  sorry -- Proof:
-         -- 1. Run Phase 1 → obtain reduced table.
-         -- 2. Run Phase 2 → either AllSingleton or some-empty.
-         -- 3. AllSingleton → left (reducedTable_singleton_stable).
-         -- 4. some-empty → right (reducedTable_empty_no_stable).
+  obtain ⟨reduced, hsym, hcompat, hdual, hcasc, hphase1⟩ :=
+    phase1_produces_reduced_table prof hsize hvalid
+  by_cases hall : ∀ a, reduced a ≠ []
+  · rcases phase2 reduced prof hsize hcompat hsym hdual hcasc with
+      ⟨final, hsing, hsym', hcompat'⟩ | ⟨a, final, hempty', hsym', hcompat'⟩
+    · exact Or.inl ⟨singletonMatching final,
+        reducedTable_singleton_stable final prof hsize hvalid hcompat' hsym' hsing⟩
+    · exact Or.inr (reducedTable_empty_no_stable final prof hsize hvalid
+        hcompat' hsym' a hempty')
+  · push_neg at hall
+    obtain ⟨a, ha⟩ := hall
+    rcases hphase1 a with hne | hno
+    · exact absurd ha hne
+    · exact Or.inr hno
 
 end
 
