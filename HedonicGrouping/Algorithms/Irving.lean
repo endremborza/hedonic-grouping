@@ -47,6 +47,17 @@ def ReducedListCompatible (reduced : α → List α)
 def ReducedTableSymmetric (reduced : α → List α) : Prop :=
   ∀ a b : α, b ∈ reduced a ↔ a ∈ reduced b
 
+/-- Cascade invariant: agents with singleton lists have matched partners.
+    Mirrors `src/irving.py::_cascade`. After Phase 1's cascade pass and
+    after each rotation elimination, if `b ∈ reduced a` and `reduced a`
+    has length 1, then `reduced b` also has length 1.
+
+    This is what guarantees Phase 2's rotation-finding iteration
+    `p ↦ last(reduced (second(reduced p)))` stays inside the length-≥-2
+    agents and therefore terminates with a true rotation. -/
+def CascadeInvariant (reduced : α → List α) : Prop :=
+  ∀ a b : α, b ∈ reduced a → (reduced a).length = 1 → (reduced b).length = 1
+
 /-! ## Rotation machinery -/
 
 /-- A rotation cycle: proposer-partner pairs forming a cycle of length ≥ 2. -/
@@ -248,22 +259,26 @@ noncomputable def P1State.totalLength (s : P1State α) : ℕ :=
   Finset.univ.sum fun a => (s.table a).length
 
 /-- **Phase 1 output.** Starting from a valid size-2 profile, the
-    proposal-rejection loop terminates with a reduced table that is
-    symmetric, compatible, dual, and either nowhere-empty or the instance
-    has no pairwise-stable matching. -/
+    proposal-rejection loop (followed by the cascade pass) terminates with
+    a reduced table that is symmetric, compatible, dual, cascade-closed,
+    and either nowhere-empty or the instance has no pairwise-stable
+    matching. -/
 theorem phase1_produces_reduced_table
     (prof : PreferenceProfile α) (hsize : SizeTwo prof) (hvalid : IsValidProfile prof) :
     ∃ (reduced : α → List α),
       ReducedTableSymmetric reduced ∧
       ReducedListCompatible reduced prof ∧
       Phase1Duality reduced ∧
+      CascadeInvariant reduced ∧
       (∀ a : α, (reduced a) ≠ [] ∨
         ∀ μ : Grouping α, ¬ PairwiseStable prof μ) := by
-  sorry -- Proof: Run the proposal-rejection loop.
+  sorry -- Proof: Run the proposal-rejection loop, then the cascade pass.
          -- Termination: totalLength strictly decreases with each rejection.
          -- Symmetry: each rejection removes both directions.
          -- Compatibility: only tail-truncation, never reordering.
          -- Duality: if first(b) = a, then a holds b, and b is last on a's list.
+         -- CascadeInvariant: the cascade pass propagates forced matches —
+         -- length-1 lists pair only with length-1 lists.
 
 /-! ## Phase 2 — iterated rotation elimination -/
 
@@ -329,29 +344,87 @@ theorem eliminateRotation_decreases_totalLength
   unfold totalLength
   exact Finset.sum_lt_sum (fun a _ => h_le a) ⟨q, Finset.mem_univ _, h_strict⟩
 
+/-! ### Phase 2 iteration step -/
+
+/-- Phase 2 iteration step: from `p`, follow
+    `last(reduced (second(reduced p)))`. Self-loop default when
+    `(reduced p).length < 2`. -/
+noncomputable def phase2Step (reduced : α → List α) (p : α) : α :=
+  if h : 2 ≤ (reduced p).length then
+    (reduced (reduced p)[1]).getLastD (reduced p)[1]
+  else
+    p
+
+omit [Fintype α] in
+/-- Under `ReducedTableSymmetric + CascadeInvariant`, the Phase 2 step
+    preserves `length ≥ 2`. The key well-definedness fact for
+    `findRotation`'s iteration. -/
+lemma phase2Step_length_ge_two
+    {reduced : α → List α}
+    (hsym : ReducedTableSymmetric reduced)
+    (hcasc : CascadeInvariant reduced)
+    {p : α} (hp : 2 ≤ (reduced p).length) :
+    2 ≤ (reduced (phase2Step reduced p)).length := by
+  have h1 : 1 < (reduced p).length := hp
+  set q : α := (reduced p)[1] with hq_def
+  have hstep : phase2Step reduced p = (reduced q).getLastD q := by
+    unfold phase2Step
+    rw [dif_pos hp]
+  have hqp : q ∈ reduced p := List.getElem_mem h1
+  have hpq : p ∈ reduced q := (hsym p q).mp hqp
+  have hqne : reduced q ≠ [] := List.ne_nil_of_mem hpq
+  have hqpos : 1 ≤ (reduced q).length := List.length_pos_of_ne_nil hqne
+  have hqlen2 : 2 ≤ (reduced q).length := by
+    by_contra h
+    push_neg at h
+    have hqlen1 : (reduced q).length = 1 := by omega
+    have : (reduced p).length = 1 := hcasc q p hpq hqlen1
+    omega
+  set p' : α := (reduced q).getLast hqne with hp'_def
+  have hstep_eq : phase2Step reduced p = p' := by
+    rw [hstep, hp'_def, List.getLastD_eq_getLast?,
+        List.getLast?_eq_some_getLast hqne, Option.getD_some]
+  rw [hstep_eq]
+  have hp'_mem : p' ∈ reduced q := by rw [hp'_def]; exact List.getLast_mem hqne
+  have hqp' : q ∈ reduced p' := (hsym q p').mp hp'_mem
+  have hp'ne : reduced p' ≠ [] := List.ne_nil_of_mem hqp'
+  have hp'pos : 1 ≤ (reduced p').length := List.length_pos_of_ne_nil hp'ne
+  by_contra h
+  push_neg at h
+  have hp'len1 : (reduced p').length = 1 := by omega
+  have : (reduced q).length = 1 := hcasc p' q hqp' hp'len1
+  omega
+
 /-- Find a rotation in the reduced table. The return type packages the
     cycle with its `IsRotation` witness — the prior signature returned an
     unconstrained `RotationCycle α`, which is trivially inhabited from any
     element of `α` and so did not bind the result to be a real rotation.
 
-    The construction (left as a sorry) iterates
-    `p ↦ last(reduced (second(reduced p)))` from `p_0 := a`; finiteness of
-    `α` forces a cycle, which is the rotation. -/
+    The construction (left as a sorry) iterates `phase2Step reduced` from
+    `p_0 := a`; finiteness of `α` forces a cycle, which is the rotation.
+    `phase2Step_length_ge_two` is the supporting lemma: each step stays
+    inside `length ≥ 2`, so `(reduced p_i)[1]` is always defined. -/
 noncomputable def findRotation (reduced : α → List α)
     (hdual : Phase1Duality reduced)
     (hsym : ReducedTableSymmetric reduced)
+    (hcasc : CascadeInvariant reduced)
     (a : α) (ha : 2 ≤ (reduced a).length) :
     { c : RotationCycle α // IsRotation c reduced } := by
   sorry
 
-/-- Phase 2 iteration: eliminate rotations until termination. -/
+/-- Phase 2 iteration: eliminate rotations until termination.
+
+    Each iteration re-establishes `CascadeInvariant` after `eliminateRotation`
+    by running a cascade pass (mirroring `src/irving.py::_phase2`), so the
+    invariant is maintained across the recursion. -/
 noncomputable def phase2
     (reduced : α → List α)
     (prof : PreferenceProfile α)
     (hsize : SizeTwo prof)
     (hcompat : ReducedListCompatible reduced prof)
     (hsym : ReducedTableSymmetric reduced)
-    (hdual : Phase1Duality reduced) :
+    (hdual : Phase1Duality reduced)
+    (hcasc : CascadeInvariant reduced) :
     (∃ (final : α → List α), AllSingleton final ∧
       ReducedTableSymmetric final ∧ ReducedListCompatible final prof) ∨
     (∃ (a : α), ∃ (final : α → List α),
