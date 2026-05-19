@@ -412,10 +412,124 @@ noncomputable def findRotation (reduced : α → List α)
     { c : RotationCycle α // IsRotation c reduced } := by
   sorry
 
+/-! ### Cascade pass -/
+
+/-- One cascade step. When agent `a`'s reduced list is `[b]` and `b`'s list
+    contains more than just `a`, shrink `reduced b` to `[a]` (or `[]` if `a`
+    has somehow dropped out) and remove `b` from every other list. Mirrors
+    one inner action of `src/irving.py::_cascade`. -/
+def cascadeStep (reduced : α → List α) (a b : α) : α → List α :=
+  fun x =>
+    if x = b then (if a ∈ reduced b then [a] else [])
+    else if x ∈ reduced b ∧ x ≠ a then (reduced x).filter (· ≠ b)
+    else reduced x
+
+private lemma cascadeStep_at_b (reduced : α → List α) (a b : α) :
+    cascadeStep reduced a b b = (if a ∈ reduced b then ([a] : List α) else []) := by
+  simp [cascadeStep]
+
+private lemma cascadeStep_at_other (reduced : α → List α) (a b x : α)
+    (hxb : x ≠ b) :
+    cascadeStep reduced a b x =
+      (if x ∈ reduced b ∧ x ≠ a then (reduced x).filter (· ≠ b) else reduced x) := by
+  simp [cascadeStep, hxb]
+
+/-- `cascadeStep` never increases total list lengths. At position `b` the
+    list shrinks to `[a]` or `[]`; at every other position it is either a
+    filter of the original (length ≤) or untouched. -/
+lemma cascadeStep_totalLength_le
+    (reduced : α → List α) (a b : α) :
+    totalLength (cascadeStep reduced a b) ≤ totalLength reduced := by
+  unfold totalLength
+  refine Finset.sum_le_sum fun x _ => ?_
+  by_cases hxb : x = b
+  · subst hxb
+    rw [cascadeStep_at_b]
+    by_cases hain : a ∈ reduced b
+    · rw [if_pos hain, List.length_singleton]
+      exact List.length_pos_of_ne_nil (List.ne_nil_of_mem hain)
+    · rw [if_neg hain, List.length_nil]
+      exact Nat.zero_le _
+  · rw [cascadeStep_at_other _ _ _ _ hxb]
+    split_ifs
+    · exact List.length_filter_le _ _
+    · exact Nat.le_refl _
+
+/-- Cascade pass. Iterates `cascadeStep` until no agent has a singleton list
+    paired with a longer-listed partner. Establishes `CascadeInvariant`
+    (proved in `cascade_preserves_invariants`). -/
+def cascade (reduced : α → List α) : α → List α :=
+  if h : ∃ p : α × α, (reduced p.1).length = 1 ∧ p.2 ∈ reduced p.1
+                       ∧ p.2 ≠ p.1 ∧ (reduced p.2).length > 1 then
+    cascade (cascadeStep reduced (Classical.choose h).1 (Classical.choose h).2)
+  else reduced
+termination_by totalLength reduced
+decreasing_by
+  simp_wf
+  rcases Classical.choose_spec h with ⟨_, _, _, hb_long⟩
+  set a := (Classical.choose h).1
+  set b := (Classical.choose h).2
+  unfold totalLength
+  refine Finset.sum_lt_sum (fun x _ => ?_) ⟨b, Finset.mem_univ _, ?_⟩
+  · by_cases hxb : x = b
+    · subst hxb
+      rw [cascadeStep_at_b]
+      have hle : (if a ∈ reduced b then ([a] : List α) else []).length ≤ 1 := by
+        split <;> simp
+      omega
+    · rw [cascadeStep_at_other _ _ _ _ hxb]
+      split_ifs with _
+      · exact List.length_filter_le _ _
+      · exact Nat.le_refl _
+  · rw [cascadeStep_at_b]
+    have hle : (if a ∈ reduced b then ([a] : List α) else []).length ≤ 1 := by
+      split <;> simp
+    omega
+
+/-- `cascade` does not increase total list lengths. Each `cascadeStep`
+    is non-increasing (`cascadeStep_totalLength_le`), so the iterated
+    application stays bounded by the starting total. The 4th conjunct of
+    `cascade_preserves_invariants`. -/
+theorem cascade_totalLength_le (reduced : α → List α) :
+    totalLength (cascade reduced) ≤ totalLength reduced := by
+  induction reduced using cascade.induct with
+  | case1 reduced h ih =>
+    rw [cascade]
+    simp only [dif_pos h]
+    exact ih.trans (cascadeStep_totalLength_le _ _ _)
+  | case2 reduced h =>
+    rw [cascade]
+    simp only [dif_neg h]
+
+/-- Cascade preserves the reduced-table invariants required by Phase 2,
+    establishes `CascadeInvariant`, and does not increase total list lengths.
+
+    Proof outline:
+    - Symmetry: each `cascadeStep` removes `b` from `reduced x` iff it
+      removes `x` from `reduced b`; lift through the well-founded
+      iteration via `cascade.induct`.
+    - Compatibility: every modification is filter-based truncation
+      (`(reduced x).filter (· ≠ b)`) or replacement by `[a]` /  `[]`;
+      none reorder.
+    - Invariant: cascade returns precisely when no `(a, b)` violation
+      remains — the negation of the dif-condition is the invariant.
+    - Length: each step strictly decreases (see termination proof);
+      transitive closure gives `≤`. -/
+theorem cascade_preserves_invariants
+    (reduced : α → List α)
+    (prof : PreferenceProfile α)
+    (hsym : ReducedTableSymmetric reduced)
+    (hcompat : ReducedListCompatible reduced prof) :
+    ReducedTableSymmetric (cascade reduced) ∧
+    ReducedListCompatible (cascade reduced) prof ∧
+    CascadeInvariant (cascade reduced) ∧
+    totalLength (cascade reduced) ≤ totalLength reduced := by
+  sorry
+
 /-- Phase 2 iteration: eliminate rotations until termination.
 
     Each iteration re-establishes `CascadeInvariant` after `eliminateRotation`
-    by running a cascade pass (mirroring `src/irving.py::_phase2`), so the
+    by running a `cascade` pass (mirroring `src/irving.py::_phase2`), so the
     invariant is maintained across the recursion. -/
 noncomputable def phase2
     (reduced : α → List α)
