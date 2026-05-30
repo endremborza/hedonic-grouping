@@ -1,7 +1,7 @@
 [project]
 name = "hedonic-grouping"
 version = "0.1.0"
-description = "Add your description here"
+description = "Lean 4 formalization of a unifying algorithm for stable matching as hedonic coalition formation."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
