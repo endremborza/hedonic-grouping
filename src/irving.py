@@ -67,25 +67,31 @@ def _phase1(agents: list[Agent], table: dict[Agent, list[Agent]]) -> bool:
                     table[c].remove(b)
             table[b] = table[b][: idx + 1]
 
-    _cascade(agents, table)
+    _reduce(agents, table)
     return True
 
 
-def _cascade(agents: list[Agent], table: dict[Agent, list[Agent]]) -> None:
-    """Propagate forced matches: when a list has length 1, ensure the partner's
-    list also reduces to just this agent. Repeats until stable."""
+def _reduce(agents: list[Agent], table: dict[Agent, list[Agent]]) -> None:
+    """Restore the stable-table (duality) invariant: each agent's first choice
+    must rank that agent last. Whenever `a`'s first choice `f` ranks someone
+    below `a`, those entries cannot belong to any stable matching, so they are
+    deleted symmetrically. Repeats to fixpoint. Maintaining this invariant is
+    what keeps every Phase 2 rotation chain among length>=2 lists (no spurious
+    length-1 self-loops)."""
     changed = True
     while changed:
         changed = False
         for a in agents:
-            if len(table[a]) == 1:
-                b = table[a][0]
-                to_remove = [c for c in table[b] if c != a]
-                if to_remove:
-                    for c in to_remove:
-                        table[b].remove(c)
-                        if b in table[c]:
-                            table[c].remove(b)
+            if not table[a]:
+                continue
+            f = table[a][0]
+            if a in table[f]:
+                idx = table[f].index(a)
+                if len(table[f]) > idx + 1:
+                    for c in table[f][idx + 1 :]:
+                        if f in table[c]:
+                            table[c].remove(f)
+                    table[f] = table[f][: idx + 1]
                     changed = True
 
 
@@ -127,7 +133,7 @@ def _phase2(
 ) -> dict[Agent, Agent] | None:
     """Rotation elimination phase. Returns stable matching or None."""
     while True:
-        _cascade(agents, table)
+        _reduce(agents, table)
         if any(len(table[a]) == 0 for a in agents):
             return None
         rotation = _find_rotation(agents, table)

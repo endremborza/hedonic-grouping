@@ -1,6 +1,3 @@
-import HedonicGrouping.Defs
-import HedonicGrouping.GaleShapley
-import HedonicGrouping.Irving
+import HedonicGrouping.Exec
 
-def main : IO Unit := do
-  IO.println "hedonic-grouping formalization loaded"
+def main : IO UInt32 := HedonicGrouping.Exec.runCli

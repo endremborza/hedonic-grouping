@@ -16,25 +16,12 @@ from ..generators import (
     profiles_rmp,
     random_rmp,
     random_smp,
+    rmp_to_hedonic,
     smp_agents,
+    smp_to_hedonic,
 )
 from ..hedonic import solve as hedonic_solve
 from ..irving import irving
-
-
-def _smp_to_hedonic(
-    mp: dict[str, list[str]], wp: dict[str, list[str]]
-) -> HedonicProfile:
-    out: HedonicProfile = {}
-    for m, pref in mp.items():
-        out[m] = [frozenset({m, w}) for w in pref]
-    for w, pref in wp.items():
-        out[w] = [frozenset({w, m}) for m in pref]
-    return out
-
-
-def _rmp_to_hedonic(prefs: dict[str, list[str]]) -> HedonicProfile:
-    return {a: [frozenset({a, b}) for b in p] for a, p in prefs.items()}
 
 
 @pytest.mark.parametrize("n,seed", [(n, s) for n in (3, 4) for s in range(30)])
@@ -44,7 +31,7 @@ def test_marriage_to_hedonic(n: int, seed: int) -> None:
     gs_match = gale_shapley(mp, wp)
     assert is_stable_marriage(mp, wp, gs_match)
 
-    h_prefs = _smp_to_hedonic(mp, wp)
+    h_prefs = smp_to_hedonic(mp, wp)
     h_sol = hedonic_solve(h_prefs)
     assert h_sol is not None
     assert is_stable_hedonic(h_prefs, h_sol)
@@ -60,7 +47,7 @@ def test_roommates_to_hedonic_exhaustive(n: int) -> None:
     """Irving and hedonic agree on solvability for every n=4 RMP instance."""
     for prefs in profiles_rmp(n):
         irv = irving(prefs)
-        h_sol = hedonic_solve(_rmp_to_hedonic(prefs))
+        h_sol = hedonic_solve(rmp_to_hedonic(prefs))
         assert (irv is None) == (h_sol is None), prefs
         if irv is not None:
             assert is_stable_roommates(prefs, irv)
@@ -73,7 +60,7 @@ def test_roommates_to_hedonic_exhaustive(n: int) -> None:
 def test_roommates_to_hedonic_random(n: int, seed: int) -> None:
     prefs = random_rmp(n, seed)
     irv = irving(prefs)
-    h_sol = hedonic_solve(_rmp_to_hedonic(prefs))
+    h_sol = hedonic_solve(rmp_to_hedonic(prefs))
     assert (irv is None) == (h_sol is None)
     if irv is not None:
         assert is_stable_roommates(prefs, irv)

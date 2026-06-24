@@ -14,17 +14,15 @@ open HedonicGrouping.Core
 
 variable {α : Type*} [DecidableEq α] [Fintype α]
 
-/-- Partition of agents into two sides. -/
+/-- Partition of agents into two sides; `isMen a` holds iff `a` is on the
+    "men" side. -/
 structure BipartiteStructure (α : Type*) where
-  isMen : α → Bool
+  isMen : α → Prop
 
-def BipartiteStructure.isWomen (bp : BipartiteStructure α) (a : α) : Bool :=
-  !bp.isMen a
-
-/-- Every listed coalition is cross-side: in any size-2 pair, one member
-    from each side. -/
+/-- Every listed coalition is cross-side: in any size-2 pair the two members
+    sit on opposite sides (exactly one is a man). -/
 def BipartitePref (bp : BipartiteStructure α) (prof : PreferenceProfile α) : Prop :=
-  ∀ a : α, ∀ G ∈ prof a, ∀ b ∈ G, ∀ c ∈ G, b ≠ c → bp.isMen b ≠ bp.isMen c
+  ∀ a : α, ∀ G ∈ prof a, ∀ b ∈ G, ∀ c ∈ G, b ≠ c → (bp.isMen b ↔ ¬ bp.isMen c)
 
 /-- SMP instance: valid, size-2, bipartite for some partition. -/
 def IsSMP (prof : PreferenceProfile α) : Prop :=

@@ -31,3 +31,15 @@ def test_irving_random(n: int, seed: int) -> None:
     matching = irving(prefs)
     if matching is not None:
         assert is_stable_roommates(prefs, matching)
+
+
+@pytest.mark.parametrize("seed,solvable", [(4674, True), (3885, False)])
+def test_irving_phase2_selfloop_regression(seed: int, solvable: bool) -> None:
+    """Phase-2 self-loop bug: at n=8 the old length-1 `_cascade` removed stable
+    pairs (seed 4674) or answered an unsolvable instance (seed 3885)."""
+    prefs = random_rmp(8, seed)
+    matching = irving(prefs)
+    if solvable:
+        assert matching is not None and is_stable_roommates(prefs, matching)
+    else:
+        assert matching is None

@@ -32,19 +32,29 @@ variable {α : Type*} [DecidableEq α] [Fintype α]
 
 /-! ## Problem-class containment -/
 
+omit [DecidableEq α] [Fintype α] in
 /-- Every SMP instance is an HCP instance. The valid-profile requirement
     is the only HCP precondition; bipartiteness and size-2 are extra
     structure SMP carries that HCP doesn't see. -/
 theorem isSMP_to_isHCP {prof : PreferenceProfile α} (h : IsSMP prof) : IsHCP prof :=
   h.1
 
+omit [DecidableEq α] [Fintype α] in
 /-- Every RMP instance is an HCP instance. Same reasoning — size-2 is
     structure RMP carries that HCP doesn't see. -/
 theorem isRMP_to_isHCP {prof : PreferenceProfile α} (h : IsRMP prof) : IsHCP prof :=
   h.1
 
+omit [DecidableEq α] [Fintype α] in
+/-- Every SMP instance is an RMP instance: SMP is RMP plus a bipartite
+    partition. Makes the strict-subset relation noted in `Problems.RMP`
+    explicit. -/
+theorem isSMP_to_isRMP {prof : PreferenceProfile α} (h : IsSMP prof) : IsRMP prof :=
+  ⟨h.1, h.2.1⟩
+
 /-! ## Size-2 bridges -/
 
+omit [DecidableEq α] [Fintype α] in
 /-- Under size-2 preferences, any blocking coalition has exactly 2 members. -/
 lemma blocking_coalition_sizeTwo
     (prof : PreferenceProfile α) (μ : Grouping α) (S : Finset α)
@@ -53,9 +63,9 @@ lemma blocking_coalition_sizeTwo
     S.card = 2 := by
   obtain ⟨_, hpref⟩ := hblock
   obtain ⟨a, ha⟩ := Finset.card_pos.mp (by omega : 0 < S.card)
-  obtain ⟨i, _, _, hi, _⟩ := hpref a ha
-  exact hsize a S (hi ▸ List.getElem_mem (by exact i.isLt))
+  exact hsize a S (hpref a ha).fst_mem
 
+omit [Fintype α] in
 /-- **Core stability equals pairwise stability under size-2 preferences.** -/
 theorem coreStable_iff_pairwiseStable
     (prof : PreferenceProfile α) (μ : Grouping α)
@@ -80,39 +90,19 @@ theorem coreStable_iff_pairwiseStable
 /-! ## Considerable ↔ GS proposal-acceptance -/
 
 omit [Fintype α] in
-/-- Under size-2, `Considerable G a prop` reduces to a single proposal
+/-- **Considerable matches GS proposal-acceptance on pairs.** Under
+    size-2, `Considerable {a, b} a prop` reduces to a single proposal
     check: the other member proposes the pair. -/
-lemma considerable_iff_mutual_proposal
-    (a b : α) (hab : a ≠ b)
-    (G : Finset α) (hG : G = {a, b})
-    (prop : α → Option (Finset α)) :
-    Considerable G a prop ↔ prop b = some G := by
-  constructor
-  · intro hcons
-    apply hcons b
-    · rw [hG]; simp
-    · exact hab.symm
-  · intro hb x hxG hxa
-    have : x = b := by
-      rw [hG] at hxG
-      simp [Finset.mem_insert, Finset.mem_singleton] at hxG
-      rcases hxG with rfl | rfl
-      · exact absurd rfl hxa
-      · rfl
-    rw [this]
-    exact hb
-
-/-- GS proposal-acceptance: `b` proposes `{a, b}`. -/
-def GSHolds (prop : α → Option (Finset α)) (a b : α) : Prop :=
-  prop b = some {a, b}
-
-omit [Fintype α] in
-/-- **Considerable matches GS proposal-acceptance on pairs.** -/
 lemma considerable_matches_gs
     (a b : α) (hab : a ≠ b)
     (prop : α → Option (Finset α)) :
-    Considerable {a, b} a prop ↔ GSHolds prop a b := by
-  unfold GSHolds
-  exact considerable_iff_mutual_proposal a b hab {a, b} rfl prop
+    Considerable {a, b} a prop ↔ prop b = some {a, b} := by
+  constructor
+  · intro hcons
+    exact hcons b (by simp) hab.symm
+  · intro hb x hxG hxa
+    simp only [Finset.mem_insert, Finset.mem_singleton] at hxG
+    rw [hxG.resolve_left hxa]
+    exact hb
 
 end HedonicGrouping.Unification

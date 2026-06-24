@@ -8,10 +8,12 @@ namespace HedonicGrouping.Problems.HCP
 Agents rank admissible coalitions; a grouping is core-stable iff no
 coalition blocks. Solved (in the novel algorithm's regime) by HCF.
 
-`Considerable` — the acceptance test used by HCF — is defined here
-because it is the definitional glue that any HCF-style proposal mechanism
-plugs into. Under size-2 preferences it collapses to GS's proposal
-acceptance; that bridge lives in `Unification`.
+`Considerable` — the proposal-acceptance predicate this problem layer
+exposes — is defined here because it is the definitional glue that any
+HCF-style proposal mechanism plugs into. (HCF's executable form runs the
+analogous `isConsiderableB` over its own `HCFProblem` state rather than
+this `Prop` directly.) Under size-2 preferences it collapses to GS's
+proposal acceptance; that bridge lives in `Unification`.
 -/
 
 open HedonicGrouping.Core

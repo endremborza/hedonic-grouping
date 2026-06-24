@@ -134,3 +134,21 @@ def profiles_hedonic(n: int, samples: int = 50) -> Iterator[HedonicProfile]:
     else:
         for s in range(samples):
             yield random_hedonic(n, s)
+
+
+# --- Embeddings into HCP (size-2 coalitions) ---
+
+
+def smp_to_hedonic(
+    men_prefs: dict[Agent, list[Agent]], women_prefs: dict[Agent, list[Agent]]
+) -> HedonicProfile:
+    out: HedonicProfile = {}
+    for m, pref in men_prefs.items():
+        out[m] = [frozenset({m, w}) for w in pref]
+    for w, pref in women_prefs.items():
+        out[w] = [frozenset({w, m}) for m in pref]
+    return out
+
+
+def rmp_to_hedonic(prefs: dict[Agent, list[Agent]]) -> HedonicProfile:
+    return {a: [frozenset({a, b}) for b in p] for a, p in prefs.items()}

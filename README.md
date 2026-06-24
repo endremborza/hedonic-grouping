@@ -22,7 +22,8 @@ Three problems: **SMP** (stable marriage), **RMP** (stable roommates),
 deferred.
 
 Three algorithms: **GS** (Gale-Shapley), **IRV** (Irving), **HCF**. GS
-and IRV are proved correct on SMP and RMP directly. The unification
+is proved correct on SMP directly; IRV's correctness on RMP is in
+progress (see Formalization state). The unification
 (HCF subsumes GS/IRV; SMP/RMP embed in HCP) is a separate layer in
 `Correctness/` — algorithms do not depend on it.
 
@@ -47,19 +48,57 @@ HedonicGrouping/
     HCF_subsumes_IRV.lean            trajectory-equivalence stub
   Unification.lean                   size-2 bridges, isSMP/RMP_to_isHCP
   Summary.lean                       top-level re-exports
+  Exec.lean                          executable CLI glue (JSON ↔ Fin n, runFuel driver)
+Main.lean                            CLI entry point: lake exe hedonic-grouping
 refs/stable-marriage-lean/           reference GS formalization (0 sorries)
 src/                                 Python reference implementations + tests
 tex/                                 LaTeX paper
 ```
 
+The HCF algorithm is computable: `make build` compiles a `hedonic-grouping`
+executable that reads a JSON instance on stdin
+(`{"agents":[…],"prefs":{…}}`) and prints the resulting grouping (or
+`null`), enabling direct comparison against the Python reference.
+
 ## Formalization state
 
-**10 sorries across 4 files.** All claims pass `make disprove` (no
-counterexamples found within the timeout).
+**4 sorries across 4 files.** AXLE `disprove` finds no counterexample to the
+open statements within the timeout, but that is only weak evidence where the
+goal shape defeats `grind`: `hcf_coreStable` is in fact unprovable while
+`hcfGrouping` remains the `fun a => {a}` stub (below).
+
+**Irving Phase 2 — existential solvability (corrected 2026-06-23).** Phase 2's
+correctness was originally staked on `StableMatchingsSurvive` — that rotation
+elimination never deletes a pair of *any* pairwise-stable matching. That claim
+is **false**: on the canonical two-stable-matching instance
+(`p0:[q1,q0] p1:[q0,q1] q0:[p0,p1] q1:[p1,p0]`), Phase 1 yields the dual table
+and eliminating the exposed rotation `[(p0,q0),(p1,q1)]` deletes exactly the
+pairs `{p0,q1}`/`{p1,q0}` — *precisely* the pairs of the other stable matching
+(verified against the Python oracle). Rotation elimination is *meant* to discard
+stable matchings, so per-step universal survival cannot hold. Phase 2 is
+therefore threaded through the **existential** invariant `SolvableInTable` (the
+table still admits *some* surviving stable matching) rather than universal
+survival: `phase2` now concludes "reduces to an all-singleton stable matching,
+or the table is not solvable", and the negative branch of
+`irving_decides_stability` is sound — it consumes the true existential crux,
+seeded from Phase 1's (still true) `StableMatchingsSurvive` via
+`solvableInTable_of_survive`. The single open Phase-2 `sorry` is now the
+standard, provable crux `solvableInTable_step` (existential solvability is
+preserved by a step; witness: the rotation-shifted matching). The duality
+machinery (`Phase1Duality`, the `_reduce`/`reduceTable` mirror,
+`isRotation_no_selfLoop`, `rotationCycle_length_ge_2_of_dual`) is sound and
+reused.
+
+Negative stability conclusions quantify over genuine pair matchings
+(`Core.IsPairMatching`: every coalition is a ranked pair, partners
+agree). Bare `PairwiseStable`/`CoreStable` are vacuously satisfiable —
+`Ranks` only compares ranked coalitions, so groupings built from
+unranked coalitions (e.g. all-singletons under a size-2 profile) admit
+no blocking pair.
 
 | File | Sorries | Notes |
 |---|---:|---|
-| `Algorithms/Irving.lean` | 7 | Phase 1, Phase 2, cascade, endpoint theorems |
+| `Algorithms/Irving.lean` | 1 | Existential-solvability step (`solvableInTable_step`) |
 | `Algorithms/HCF.lean` | 1 | `hcf_coreStable`; blocked on HCF definitions |
 | `Correctness/HCF_subsumes_GS.lean` | 1 | Optional trajectory-equivalence claim |
 | `Correctness/HCF_subsumes_IRV.lean` | 1 | Optional trajectory-equivalence claim |
@@ -85,6 +124,13 @@ Python tests (pytest, `.venv` managed by `uv`):
 .venv/bin/pytest         # or `make python-check`
 ```
 
+Executable + differential check (local Lean build, not AXLE):
+
+```bash
+make build               # compile the hedonic-grouping CLI
+make diff                # build, then assert Lean output == Python oracle
+```
+
 ## Python implementations
 
 Reference implementations exercised by a pytest suite. The
@@ -98,4 +144,5 @@ small n, random samples above.
 - `src/irving.py` — Irving's algorithm for stable roommates
 - `src/hedonic.py` — general hedonic grouping (recursive + iterative)
 - `src/tests/` — pytest suite: edge-case fixtures plus generated
-  coverage per algorithm and cross-algorithm checks
+  coverage per algorithm, cross-algorithm checks, and a Lean-vs-Python
+  executable parity check (skipped without a `make build`)

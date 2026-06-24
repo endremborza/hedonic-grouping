@@ -45,15 +45,18 @@ noncomputable def GSState.proposedSet (s : GSState α) : Finset (α × α) := by
 
 noncomputable def GSState.proposedCount (s : GSState α) : ℕ := s.proposedSet.card
 
+omit [DecidableEq α] in
 lemma GSState.mem_proposedSet (s : GSState α) (p : α × α) :
     p ∈ s.proposedSet ↔ s.proposed p.1 p.2 := by
   classical
   simp [GSState.proposedSet]
 
+omit [DecidableEq α] in
 lemma GSState.proposedCount_init : (GSState.init : GSState α).proposedCount = 0 := by
   classical
   simp [GSState.proposedCount, GSState.proposedSet, GSState.init]
 
+omit [DecidableEq α] in
 lemma GSState.proposedCount_le_card (s : GSState α) :
     s.proposedCount ≤ Fintype.card α * Fintype.card α := by
   classical
@@ -63,6 +66,7 @@ lemma GSState.proposedCount_le_card (s : GSState α) :
     _ = Fintype.card (α × α) := Finset.card_univ
     _ = Fintype.card α * Fintype.card α := Fintype.card_prod _ _
 
+omit [DecidableEq α] in
 /-- Monotone-bounded termination meta-lemma. -/
 theorem gs_terminates_within
     (step : GSState α → GSState α) (Term : GSState α → Prop)
@@ -114,9 +118,9 @@ theorem gs_terminates_within
 /-- Agent `m` is a free proposer with remaining candidates. -/
 def GSFree (bp : BipartiteStructure α) (prof : PreferenceProfile α)
     (s : GSState α) (m : α) : Prop :=
-  bp.isMen m = true ∧
+  bp.isMen m ∧
   s.proposing m = none ∧
-  ∃ w, bp.isMen w = false ∧ {m, w} ∈ prof m ∧ ¬ s.proposed m w
+  ∃ w, ¬ bp.isMen w ∧ {m, w} ∈ prof m ∧ ¬ s.proposed m w
 
 /-- No free proposer with remaining candidates. -/
 def GSTerminated (bp : BipartiteStructure α) (prof : PreferenceProfile α)
@@ -127,13 +131,13 @@ def GSTerminated (bp : BipartiteStructure α) (prof : PreferenceProfile α)
 def candidateReceivers (bp : BipartiteStructure α) (prof : PreferenceProfile α)
     (s : GSState α) (m : α) : Finset α :=
   Finset.univ.filter fun w =>
-    bp.isMen w = false ∧ {m, w} ∈ prof m ∧ ¬ s.proposed m w
+    ¬ bp.isMen w ∧ {m, w} ∈ prof m ∧ ¬ s.proposed m w
 
 lemma mem_candidateReceivers
     {bp : BipartiteStructure α} {prof : PreferenceProfile α}
     {s : GSState α} {m w : α} :
     w ∈ candidateReceivers bp prof s m ↔
-      bp.isMen w = false ∧ {m, w} ∈ prof m ∧ ¬ s.proposed m w := by
+      ¬ bp.isMen w ∧ {m, w} ∈ prof m ∧ ¬ s.proposed m w := by
   simp [candidateReceivers]
 
 /-! ### Max-preferred candidate -/
@@ -145,40 +149,28 @@ noncomputable def chooseMaxCandidate (prof : PreferenceProfile α) (m : α)
     (cands : Finset α) (h : cands.Nonempty) : α :=
   (cands.exists_min_image (fun w => (prof m).idxOf {m, w}) h).choose
 
+omit [Fintype α] in
 lemma chooseMaxCandidate_mem (prof : PreferenceProfile α) (m : α)
     (cands : Finset α) (h : cands.Nonempty) :
     chooseMaxCandidate prof m cands h ∈ cands := by
   unfold chooseMaxCandidate
   exact ((cands.exists_min_image (fun w => (prof m).idxOf {m, w}) h).choose_spec).1
 
+omit [Fintype α] in
 lemma chooseMaxCandidate_min (prof : PreferenceProfile α) (m : α)
     (cands : Finset α) (h : cands.Nonempty) {w : α} (hw : w ∈ cands) :
     (prof m).idxOf {m, chooseMaxCandidate prof m cands h} ≤ (prof m).idxOf {m, w} := by
   unfold chooseMaxCandidate
   exact ((cands.exists_min_image (fun w => (prof m).idxOf {m, w}) h).choose_spec).2 w hw
 
+omit [Fintype α] in
 /-- No candidate is strictly preferred over the chosen one. -/
 lemma chooseMaxCandidate_no_better (prof : PreferenceProfile α)
     (hvalid : IsValidProfile prof) (m : α) (cands : Finset α) (h : cands.Nonempty) :
     ∀ w' ∈ cands, ¬ PrefersPartner prof m w' (chooseMaxCandidate prof m cands h) := by
-  classical
   intro w' hw' hpref
-  obtain ⟨i, j, hij, hi, hj⟩ := hpref
-  have hnodup := (hvalid m).1
-  have hi' : (prof m)[i.val]'i.isLt = {m, w'} := hi
-  have hj' : (prof m)[j.val]'j.isLt = {m, chooseMaxCandidate prof m cands h} := hj
-  have hi_idx : (prof m).idxOf {m, w'} = i.val := by
-    have h1 := List.Nodup.idxOf_getElem hnodup i.val i.isLt
-    rw [hi'] at h1
-    exact h1
-  have hj_idx :
-      (prof m).idxOf {m, chooseMaxCandidate prof m cands h} = j.val := by
-    have h1 := List.Nodup.idxOf_getElem hnodup j.val j.isLt
-    rw [hj'] at h1
-    exact h1
+  have hlt := Ranks.idxOf_lt hpref (hvalid m).1
   have hmin := chooseMaxCandidate_min prof m cands h hw'
-  rw [hj_idx, hi_idx] at hmin
-  have hij' : i.val < j.val := hij
   omega
 
 /-! ### Step, run, grouping -/
@@ -198,8 +190,7 @@ def GSState.stepWith (prof : PreferenceProfile α) (s : GSState α) (m w : α) :
       { proposing := s.proposing
         proposed := proposed' }
   | some mOld =>
-    if ∃ i j : Fin (prof w).length,
-        (prof w)[i] = {w, m} ∧ (prof w)[j] = {w, mOld} ∧ i < j then
+    if PrefersPartner prof w m mOld then
       { proposing := fun a =>
           if a = m then some w
           else if a = w then some m
@@ -236,6 +227,7 @@ def gsGrouping (s : GSState α) : Grouping α :=
 
 /-! ### Termination -/
 
+omit [Fintype α] in
 lemma stepWith_proposed (prof : PreferenceProfile α) (s : GSState α) (m w : α) :
     (GSState.stepWith prof s m w).proposed =
       fun m' w' => s.proposed m' w' ∨ (m' = m ∧ w' = w) := by
@@ -245,6 +237,7 @@ lemma stepWith_proposed (prof : PreferenceProfile α) (s : GSState α) (m w : α
 
 /-! ### stepWith branch computations -/
 
+omit [Fintype α] in
 lemma stepWith_proposing_none_accept
     (prof : PreferenceProfile α) (s : GSState α) (m w : α)
     (hpw : s.proposing w = none) (hwacc : ({m, w} : Finset α) ∈ prof w) :
@@ -254,6 +247,7 @@ lemma stepWith_proposing_none_accept
   unfold GSState.stepWith
   rw [hpw]; simp [hwacc]
 
+omit [Fintype α] in
 lemma stepWith_proposing_none_reject
     (prof : PreferenceProfile α) (s : GSState α) (m w : α)
     (hpw : s.proposing w = none) (hwacc : ({m, w} : Finset α) ∉ prof w) :
@@ -262,11 +256,11 @@ lemma stepWith_proposing_none_reject
   unfold GSState.stepWith
   rw [hpw]; simp [hwacc]
 
+omit [Fintype α] in
 lemma stepWith_proposing_some_swap
     (prof : PreferenceProfile α) (s : GSState α) (m w mOld : α)
     (hpw : s.proposing w = some mOld)
-    (hpref : ∃ i j : Fin (prof w).length,
-        (prof w)[i] = {w, m} ∧ (prof w)[j] = {w, mOld} ∧ i < j) :
+    (hpref : PrefersPartner prof w m mOld) :
     (GSState.stepWith prof s m w).proposing =
       fun a => if a = m then some w
                else if a = w then some m
@@ -277,11 +271,11 @@ lemma stepWith_proposing_some_swap
   simp only [hpw]
   rw [if_pos hpref]
 
+omit [Fintype α] in
 lemma stepWith_proposing_some_keep
     (prof : PreferenceProfile α) (s : GSState α) (m w mOld : α)
     (hpw : s.proposing w = some mOld)
-    (hpref : ¬ ∃ i j : Fin (prof w).length,
-        (prof w)[i] = {w, m} ∧ (prof w)[j] = {w, mOld} ∧ i < j) :
+    (hpref : ¬ PrefersPartner prof w m mOld) :
     (GSState.stepWith prof s m w).proposing = s.proposing := by
   show (GSState.stepWith prof s m w).proposing = _
   unfold GSState.stepWith
@@ -356,15 +350,15 @@ def Engagement (bp : BipartiteStructure α) (prof : PreferenceProfile α)
     (s : GSState α) : Prop :=
   ∀ a b, s.proposing a = some b →
     s.proposing b = some a ∧
-    bp.isMen a ≠ bp.isMen b ∧
+    (bp.isMen a ↔ ¬ bp.isMen b) ∧
     {a, b} ∈ prof a ∧
-    (bp.isMen a = true → s.proposed a b)
+    (bp.isMen a → s.proposed a b)
 
 /-- Men propose in preference order: if `m` proposed to `w` then he also
     proposed to every more-preferred receiver (woman). -/
 def ProposalDownward (bp : BipartiteStructure α) (prof : PreferenceProfile α)
     (s : GSState α) : Prop :=
-  ∀ m w w', bp.isMen m = true → bp.isMen w' = false → s.proposed m w →
+  ∀ m w w', bp.isMen m → ¬ bp.isMen w' → s.proposed m w →
     PrefersPartner prof m w' w → s.proposed m w'
 
 /-- For every past proposer `m` of receiver `w`, `w`'s current state
@@ -372,7 +366,7 @@ def ProposalDownward (bp : BipartiteStructure α) (prof : PreferenceProfile α)
     to someone she weakly prefers. -/
 def ReceiverDominates (bp : BipartiteStructure α) (prof : PreferenceProfile α)
     (s : GSState α) : Prop :=
-  ∀ w m, bp.isMen w = false → s.proposed m w →
+  ∀ w m, ¬ bp.isMen w → s.proposed m w →
     {w, m} ∉ prof w ∨
     ∃ mCur, s.proposing w = some mCur ∧
       (mCur = m ∨ PrefersPartner prof w mCur m)
@@ -384,21 +378,25 @@ def GSInvariants (bp : BipartiteStructure α) (prof : PreferenceProfile α)
 
 /-! ### Initial state -/
 
+omit [Fintype α] in
 lemma initial_engagement (bp : BipartiteStructure α) (prof : PreferenceProfile α) :
     Engagement bp prof (GSState.init : GSState α) := by
   intro a b h
   simp [GSState.init] at h
 
+omit [Fintype α] in
 lemma initial_proposalDownward (bp : BipartiteStructure α) (prof : PreferenceProfile α) :
     ProposalDownward bp prof (GSState.init : GSState α) := by
   intro m w w' _ _ h _
   simp [GSState.init] at h
 
+omit [Fintype α] in
 lemma initial_receiverDominates (bp : BipartiteStructure α) (prof : PreferenceProfile α) :
     ReceiverDominates bp prof (GSState.init : GSState α) := by
   intro w m _ h
   simp [GSState.init] at h
 
+omit [Fintype α] in
 lemma initial_invariants (bp : BipartiteStructure α) (prof : PreferenceProfile α) :
     GSInvariants bp prof (GSState.init : GSState α) :=
   ⟨initial_engagement bp prof, initial_proposalDownward bp prof,
@@ -409,18 +407,34 @@ lemma initial_invariants (bp : BipartiteStructure α) (prof : PreferenceProfile 
     The lemmas below are stated for an arbitrary `(m, w)`. The caller
     (`step_preserves_invariants`) supplies the chooser context. -/
 
+omit [Fintype α] in
+/-- When `stepWith` leaves the match assignment unchanged (the reject/keep
+    branches), `Engagement` is preserved: the existing engagements are
+    untouched and the only new `proposed` fact strengthens the history. -/
+lemma stepWith_engagement_of_proposing_eq
+    (bp : BipartiteStructure α) (prof : PreferenceProfile α)
+    (s : GSState α) (m w : α)
+    (hprop : (GSState.stepWith prof s m w).proposing = s.proposing)
+    (h : Engagement bp prof s) :
+    Engagement bp prof (GSState.stepWith prof s m w) := by
+  intro a b hab
+  rw [hprop] at hab
+  have hold := h a b hab
+  refine ⟨by rw [hprop]; exact hold.1, hold.2.1, hold.2.2.1, fun hamen => ?_⟩
+  rw [stepWith_proposed]; left; exact hold.2.2.2 hamen
+
+omit [Fintype α] in
 lemma stepWith_engagement
     (bp : BipartiteStructure α) (prof : PreferenceProfile α)
     (s : GSState α) (m w : α)
-    (hmen : bp.isMen m = true) (hwomen : bp.isMen w = false)
+    (hmen : bp.isMen m) (hwomen : ¬ bp.isMen w)
     (hacc : {m, w} ∈ prof m)
     (hmfree : s.proposing m = none)
     (h : Engagement bp prof s) :
     Engagement bp prof (GSState.stepWith prof s m w) := by
-  have hmw : m ≠ w := fun heq => by
-    rw [heq, hwomen] at hmen; exact absurd hmen (by decide)
-  have hMwomen : bp.isMen m ≠ bp.isMen w := by rw [hmen, hwomen]; decide
-  have hWmen : bp.isMen w ≠ bp.isMen m := by rw [hmen, hwomen]; decide
+  have hmw : m ≠ w := fun heq => hwomen (heq ▸ hmen)
+  have hMwomen : bp.isMen m ↔ ¬ bp.isMen w := iff_of_true hmen hwomen
+  have hWmen : bp.isMen w ↔ ¬ bp.isMen m := iff_of_false hwomen (fun h => h hmen)
   have hpr := stepWith_proposed prof s m w
   have hpwm : ∀ x, ¬ s.proposing x = some m := fun x hx => by
     have := (h x m hx).1; rw [hmfree] at this; simp at this
@@ -450,7 +464,7 @@ lemma stepWith_engagement
           subst hbm
           refine ⟨hpm, hWmen, ?_, fun hwmen => ?_⟩
           · rwa [Finset.pair_comm] at hwacc
-          · rw [hwmen] at hwomen; exact absurd hwomen (by decide)
+          · exact absurd hwmen hwomen
         · rw [hpx a ham haw] at hab
           have hold := h a b hab
           refine ⟨?_, hold.2.1, hold.2.2.1, fun hamen => by rw [hpr]; left; exact hold.2.2.2 hamen⟩
@@ -461,20 +475,16 @@ lemma stepWith_engagement
               have := hold.1; rw [hpw] at this; simp at this
             · rw [hpx b hbm hbw]; exact hold.1
     · -- None + Reject
-      have hprop := stepWith_proposing_none_reject prof s m w hpw hwacc
-      rw [hprop] at hab
-      have hold := h a b hab
-      exact ⟨by rw [hprop]; exact hold.1, hold.2.1, hold.2.2.1,
-        fun hamen => by rw [hpr]; left; exact hold.2.2.2 hamen⟩
+      exact stepWith_engagement_of_proposing_eq bp prof s m w
+        (stepWith_proposing_none_reject prof s m w hpw hwacc) h a b hab
   | some mOld =>
     have hmOld_w : s.proposing mOld = some w := (h w mOld hpw).1
     have hmOld_neq_m : mOld ≠ m := fun heq => by
       rw [heq] at hmOld_w; rw [hmfree] at hmOld_w; simp at hmOld_w
-    have hmOld_men_neq_w : bp.isMen mOld ≠ bp.isMen w := (h mOld w hmOld_w).2.1
+    have hmOld_men_neq_w : bp.isMen mOld ↔ ¬ bp.isMen w := (h mOld w hmOld_w).2.1
     have hmOld_neq_w : mOld ≠ w := fun heq => by
-      rw [heq] at hmOld_men_neq_w; exact hmOld_men_neq_w rfl
-    by_cases hpref : ∃ i j : Fin (prof w).length,
-        (prof w)[i] = {w, m} ∧ (prof w)[j] = {w, mOld} ∧ i < j
+      rw [heq] at hmOld_men_neq_w; exact iff_not_self hmOld_men_neq_w
+    by_cases hpref : PrefersPartner prof w m mOld
     · -- Some + Swap
       have hprop := stepWith_proposing_some_swap prof s m w mOld hpw hpref
       have hpm : (GSState.stepWith prof s m w).proposing m = some w := by
@@ -498,9 +508,8 @@ lemma stepWith_engagement
           have hbm : b = m := (Option.some_inj.mp hab).symm
           subst hbm
           refine ⟨hpm, hWmen, ?_, fun hwmen => ?_⟩
-          · obtain ⟨i, _, hwm, _, _⟩ := hpref
-            rw [← hwm]; exact List.getElem_mem _
-          · rw [hwmen] at hwomen; exact absurd hwomen (by decide)
+          · exact Ranks.fst_mem hpref
+          · exact absurd hwmen hwomen
         · by_cases hamOld : a = mOld
           · subst hamOld
             rw [hpmOld] at hab; simp at hab
@@ -519,17 +528,15 @@ lemma stepWith_engagement
                   rw [Option.some_inj] at this; exact absurd this.symm haw
                 · rw [hpx b hbm hbw hbmOld]; exact hold.1
     · -- Some + Keep
-      have hprop := stepWith_proposing_some_keep prof s m w mOld hpw hpref
-      rw [hprop] at hab
-      have hold := h a b hab
-      exact ⟨by rw [hprop]; exact hold.1, hold.2.1, hold.2.2.1,
-        fun hamen => by rw [hpr]; left; exact hold.2.2.2 hamen⟩
+      exact stepWith_engagement_of_proposing_eq bp prof s m w
+        (stepWith_proposing_some_keep prof s m w mOld hpw hpref) h a b hab
 
+omit [Fintype α] in
 lemma stepWith_proposalDownward
     (bp : BipartiteStructure α) (prof : PreferenceProfile α)
     (s : GSState α) (m w : α)
-    (hmen : bp.isMen m = true)
-    (hnobetter : ∀ w' : α, bp.isMen w' = false → {m, w'} ∈ prof m →
+    (hmen : bp.isMen m)
+    (hnobetter : ∀ w' : α, ¬ bp.isMen w' → {m, w'} ∈ prof m →
       ¬ s.proposed m w' → ¬ PrefersPartner prof m w' w)
     (h : ProposalDownward bp prof s) :
     ProposalDownward bp prof (GSState.stepWith prof s m w) := by
@@ -540,23 +547,21 @@ lemma stepWith_proposalDownward
   · by_cases h1 : w' = w''
     · right; exact ⟨rfl, h1⟩
     · left
-      have hacc'' : {m', w'} ∈ prof m' := by
-        obtain ⟨i, _, _, hi, _⟩ := hpref
-        rw [← hi]; exact List.getElem_mem _
+      have hacc'' : {m', w'} ∈ prof m' := Ranks.fst_mem hpref
       by_contra hnp
       exact hnobetter w' hwomen' hacc'' hnp hpref
 
+omit [Fintype α] in
 lemma stepWith_receiverDominates
     (bp : BipartiteStructure α) (prof : PreferenceProfile α)
     (hvalid : IsValidProfile prof)
     (s : GSState α) (m w : α)
-    (hmen : bp.isMen m = true) (hwomen : bp.isMen w = false)
+    (hmen : bp.isMen m) (hwomen : ¬ bp.isMen w)
     (hmfree : s.proposing m = none)
     (hE : Engagement bp prof s)
     (h : ReceiverDominates bp prof s) :
     ReceiverDominates bp prof (GSState.stepWith prof s m w) := by
-  have hmw : m ≠ w := fun heq => by
-    rw [heq, hwomen] at hmen; exact absurd hmen (by decide)
+  have hmw : m ≠ w := fun heq => hwomen (heq ▸ hmen)
   intro w_q m_q hw_q hpr_new
   rw [stepWith_proposed] at hpr_new
   cases hpw : s.proposing w with
@@ -572,7 +577,7 @@ lemma stepWith_receiverDominates
           · subst hwq_eq_w
             rw [hpw] at hpw_cur; simp at hpw_cur
           · have hwq_ne_m : w_q ≠ m := fun heq => by
-              rw [heq, hmen] at hw_q; simp at hw_q
+              rw [heq] at hw_q; exact hw_q hmen
             right
             refine ⟨mCur, ?_, hcur⟩
             rw [hprop]; simp [hwq_ne_m, hwq_eq_w]; exact hpw_cur
@@ -595,18 +600,14 @@ lemma stepWith_receiverDominates
         rwa [Finset.pair_comm] at hmem
   | some mOld =>
     have hmOld_w : s.proposing mOld = some w := (hE w mOld hpw).1
-    have hmOld_men_neq_w : bp.isMen mOld ≠ bp.isMen w := (hE mOld w hmOld_w).2.1
-    have hmOld_men : bp.isMen mOld = true := by
-      cases hb : bp.isMen mOld
-      · rw [hb, hwomen] at hmOld_men_neq_w; exact absurd rfl hmOld_men_neq_w
-      · rfl
+    have hmOld_men_neq_w : bp.isMen mOld ↔ ¬ bp.isMen w := (hE mOld w hmOld_w).2.1
+    have hmOld_men : bp.isMen mOld := hmOld_men_neq_w.mpr hwomen
     have hmOld_w_acc : {w, mOld} ∈ prof w := (hE w mOld hpw).2.2.1
     have hmOld_neq_m : mOld ≠ m := fun heq => by
       rw [heq] at hmOld_w; rw [hmfree] at hmOld_w; simp at hmOld_w
     have hmOld_neq_w : mOld ≠ w := fun heq => by
-      rw [heq, hwomen] at hmOld_men; simp at hmOld_men
-    by_cases hpref : ∃ i j : Fin (prof w).length,
-        (prof w)[i] = {w, m} ∧ (prof w)[j] = {w, mOld} ∧ i < j
+      rw [heq] at hmOld_men; exact hwomen hmOld_men
+    by_cases hpref : PrefersPartner prof w m mOld
     · -- Some + Swap
       have hprop := stepWith_proposing_some_swap prof s m w mOld hpw hpref
       rcases hpr_new with hs | ⟨hmq, hwq⟩
@@ -614,9 +615,9 @@ lemma stepWith_receiverDominates
         rcases hold with hno_acc | ⟨mCur, hpw_cur, hcur⟩
         · left; exact hno_acc
         · have hwq_ne_m : w_q ≠ m := fun heq => by
-            rw [heq, hmen] at hw_q; simp at hw_q
+            rw [heq] at hw_q; exact hw_q hmen
           have hwq_ne_mOld : w_q ≠ mOld := fun heq => by
-            rw [heq, hmOld_men] at hw_q; simp at hw_q
+            rw [heq] at hw_q; exact hw_q hmOld_men
           by_cases hwq_eq_w : w_q = w
           · subst hwq_eq_w
             rw [hpw] at hpw_cur
@@ -625,12 +626,10 @@ lemma stepWith_receiverDominates
             right
             refine ⟨m, ?_, ?_⟩
             · rw [hprop]; simp [hmw.symm]
-            · obtain ⟨i_m_w, j_mOld_w, hi_m, hj_mOld, hij⟩ := hpref
-              have hpref_m_mOld : PrefersPartner prof w_q m mOld :=
-                ⟨i_m_w, j_mOld_w, hij, hi_m, hj_mOld⟩
+            · have hpref_m_mOld : PrefersPartner prof w_q m mOld := hpref
               rcases hcur with rfl | hp
               · right; exact hpref_m_mOld
-              · right; exact Ranks_trans prof hvalid w_q hpref_m_mOld hp
+              · right; exact Ranks.trans hvalid hpref_m_mOld hp
           · right
             refine ⟨mCur, ?_, hcur⟩
             rw [hprop]; simp [hwq_ne_m, hwq_eq_w, hwq_ne_mOld]; exact hpw_cur
@@ -664,7 +663,7 @@ lemma stepWith_receiverDominates
               rcases hmem_m with hmemw | hmemold
               · exact hmw hmemw
               · exact hmOld_neq_m hmemold.symm
-            · exact absurd ⟨⟨i_m_val, hi_m_lt⟩, ⟨i_mOld_val, hi_mOld_lt⟩, hi_m, hi_mOld, hgt⟩ hpref
+            · exact absurd ⟨⟨i_m_val, hi_m_lt⟩, ⟨i_mOld_val, hi_mOld_lt⟩, hgt, hi_m, hi_mOld⟩ hpref
         · left; exact hwm_acc
 
 /-! ### Step + run preservation -/
@@ -688,7 +687,7 @@ lemma step_preserves_invariants
     rw [← hw_def] at hw_mem
     rw [mem_candidateReceivers] at hw_mem
     obtain ⟨hwomen, hacc, _hnprop⟩ := hw_mem
-    have hnobetter : ∀ w' : α, bp.isMen w' = false → {m, w'} ∈ prof m →
+    have hnobetter : ∀ w' : α, ¬ bp.isMen w' → {m, w'} ∈ prof m →
         ¬ s.proposed m w' → ¬ PrefersPartner prof m w' w := by
       intro w' hw' hacc' hnprop'
       have hw'_cand : w' ∈ candidates := by
@@ -724,30 +723,20 @@ theorem gs_pairwiseStable (bp : BipartiteStructure α)
   obtain ⟨hE, hPD, hRD⟩ := run_invariants bp prof hvalid (gsProposalBound α)
   have hterm : GSTerminated bp prof s := by rw [hs_def]; exact gs_terminates bp prof
   -- Helper: prove False given that x is the man, y is the woman.
-  suffices helper : ∀ x y : α, x ≠ y → bp.isMen x = true → bp.isMen y = false →
+  suffices helper : ∀ x y : α, x ≠ y → bp.isMen x → ¬ bp.isMen y →
       Ranks prof x {x, y} (gsGrouping s x) → Ranks prof y {x, y} (gsGrouping s y) →
       ({x, y} : Finset α) ∈ prof x → False by
     intro a b ⟨hab, hra, hrb⟩
-    have hab_acc_a : ({a, b} : Finset α) ∈ prof a := by
-      obtain ⟨i, _, _, hi, _⟩ := hra
-      rw [← hi]; exact List.getElem_mem _
-    have hab_acc_b : ({a, b} : Finset α) ∈ prof b := by
-      obtain ⟨i, _, _, hi, _⟩ := hrb
-      rw [← hi]; exact List.getElem_mem _
-    have hsides : bp.isMen a ≠ bp.isMen b :=
+    have hab_acc_a : ({a, b} : Finset α) ∈ prof a := hra.fst_mem
+    have hab_acc_b : ({a, b} : Finset α) ∈ prof b := hrb.fst_mem
+    have hsides : bp.isMen a ↔ ¬ bp.isMen b :=
       hbip a {a, b} hab_acc_a a (by simp) b (by simp) hab
-    cases hxx : bp.isMen a with
-    | true =>
-      have hb_false : bp.isMen b = false := by
-        cases hbb : bp.isMen b
-        · rfl
-        · rw [hxx, hbb] at hsides; exact absurd rfl hsides
-      exact helper a b hab hxx hb_false hra hrb hab_acc_a
-    | false =>
-      have hb_true : bp.isMen b = true := by
-        cases hbb : bp.isMen b
-        · rw [hxx, hbb] at hsides; exact absurd rfl hsides
-        · rfl
+    by_cases hxx : bp.isMen a
+    · -- a is the man, b the woman
+      exact helper a b hab hxx (hsides.mp hxx) hra hrb hab_acc_a
+    · -- a is the woman, so b is the man
+      have hb_true : bp.isMen b := by
+        by_contra hnb; exact hxx (hsides.mpr hnb)
       have hba : ({a, b} : Finset α) = {b, a} := Finset.pair_comm _ _
       have hry' : Ranks prof a {b, a} (gsGrouping s a) := by rw [← hba]; exact hra
       have hrx' : Ranks prof b {b, a} (gsGrouping s b) := by rw [← hba]; exact hrb
@@ -756,9 +745,7 @@ theorem gs_pairwiseStable (bp : BipartiteStructure α)
   -- Now prove the helper
   intro x y hxy hxmen hywomen hrx hry hxy_acc_x
   -- Step 1: show s.proposed x y
-  have hxy_acc_y : ({x, y} : Finset α) ∈ prof y := by
-    obtain ⟨i, _, _, hi, _⟩ := hry
-    rw [← hi]; exact List.getElem_mem _
+  have hxy_acc_y : ({x, y} : Finset α) ∈ prof y := hry.fst_mem
   have hpropose : s.proposed x y := by
     cases hpx : s.proposing x with
     | some w_x =>
@@ -784,9 +771,8 @@ theorem gs_pairwiseStable (bp : BipartiteStructure α)
       rw [hp] at hry; exact hry
     rcases hcur with hmCur_x | hcur'
     · rw [hmCur_x] at hpref_y_x_mCur
-      exact Ranks_irrefl prof hvalid y _ hpref_y_x_mCur
-    · exact Ranks_irrefl prof hvalid y _
-        (Ranks_trans prof hvalid y hcur' hpref_y_x_mCur)
+      exact Ranks.irrefl hvalid hpref_y_x_mCur
+    · exact Ranks.irrefl hvalid (Ranks.trans hvalid hcur' hpref_y_x_mCur)
 
 end
 

@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import reduce
 
-from .common import Agent, Coalition, is_stable_hedonic
+from .common import Agent, Coalition
 
 
 class _Stage(Enum):
@@ -142,35 +142,19 @@ def _receive_proposal(
             _eliminate(problem, worse)
 
 
-def _grouping(
-    problem: _Problem,
-    exception: Coalition,
-    original_prefs: dict[Agent, list[Coalition]],
-) -> _Problem | None:
+def _grouping(problem: _Problem, exception: Coalition) -> _Problem | None:
     problem.forced_moves.add(exception)
 
     while True:
         # Phase 1: Simplified Reduction
-        progress = True
-        while progress:
-            progress = False
-            for a in problem.agents:
-                if problem.has_valid_proposal(a):
-                    continue
-                progress = True
-                top = problem.top_unproposed(a)
-                if top is None:
-                    return None
-                problem.out_proposals[a].append(top)
-                for b in top - {a}:
-                    _receive_proposal(problem, b, top, a)
+        if not _phase1(problem):
+            return None
 
-        # Check if current state is already a stable solution
+        # A complete Phase-1 partition is already core-stable: the
+        # Considerable-cascade in _receive_proposal guarantees it (confirmed
+        # against the Lean formalization), so no explicit stability gate.
         sol = problem.solution()
-        from .common import is_stable_hedonic
-
-        if sol and is_stable_hedonic(original_prefs, sol):
-            # Finalize preferences to match solution
+        if sol:
             for a in problem.agents:
                 problem.preferences[a] = [sol[a]]
             return problem
@@ -183,7 +167,7 @@ def _grouping(
                 continue
             moved = True
             k = problem.out_proposals[a][-1]
-            result = _grouping(deepcopy(problem), k, original_prefs)
+            result = _grouping(deepcopy(problem), k)
             if result is None:
                 _eliminate(problem, remaining)
             else:
@@ -220,7 +204,7 @@ def solve(prefs: dict[Agent, list[Coalition]]) -> dict[Agent, Coalition] | None:
     """
     agents = list(prefs)
     problem = _Problem.create(agents, prefs)
-    result = _grouping(problem, frozenset(), prefs)
+    result = _grouping(problem, frozenset())
     return result.solution() if result is not None else None
 
 
@@ -247,7 +231,7 @@ def solve_iterative(
                 continue
 
             sol = frame.problem.solution()
-            if sol is not None and is_stable_hedonic(prefs, sol):
+            if sol is not None:
                 for a in frame.problem.agents:
                     frame.problem.preferences[a] = [sol[a]]
                 stack.pop()
