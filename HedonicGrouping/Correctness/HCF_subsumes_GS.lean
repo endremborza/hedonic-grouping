@@ -1,36 +1,35 @@
 import Mathlib
 import HedonicGrouping.Core
 import HedonicGrouping.Problems.SMP
-import HedonicGrouping.Algorithms.GaleShapley
+import HedonicGrouping.Problems.HCP
 import HedonicGrouping.Algorithms.HCF
 
 namespace HedonicGrouping.Correctness.HCF_subsumes_GS
 /-!
 # HCF subsumes Gale-Shapley on SMP
 
-Sharper than `hcf_solves_smp`: on a bipartite size-2 instance, HCF computes
-the same matching as GS. Not needed for the existence-level unification
-(see `HCF_HCP.lean`), but useful for the trajectory-equivalence claim in
-the paper.
+Guarantee subsumption (D1): on the embedded SMP instance, HCF's own named
+output carries the guarantee `gs_solves_smp` establishes for GS — it always
+succeeds, and its output is core-stable. The existence half may consume
+GS's own witness (`gs_solves_smp`) together with HCF completeness.
 
-The proof strategy (not yet executed): show that under bipartite size-2,
-the iterative HCF `step` reduces to a single GS-style proposal, and the
-final fixpoints coincide.
+Step-by-step trajectory equivalence (HCF's run *equals* GS's run) is a
+strictly stronger, unscheduled claim — future work, revisited only if a
+reviewer asks.
 -/
 
 open HedonicGrouping.Core
 open HedonicGrouping.Problems.SMP
-open HedonicGrouping.Algorithms.GaleShapley
+open HedonicGrouping.Problems.HCP
 open HedonicGrouping.Algorithms.HCF
 
 variable {α : Type*} [DecidableEq α] [Fintype α]
 
-/-- **HCF's output equals GS's output on every SMP instance.** -/
-theorem hcfGrouping_eq_gsGrouping_on_SMP
-    (prof : PreferenceProfile α) (bp : BipartiteStructure α)
-    (_hvalid : IsValidProfile prof) (_hsize : SizeTwo prof)
-    (_hbip : BipartitePref bp prof) :
-    hcfGrouping prof = gsGrouping (GSState.run bp prof (gsProposalBound α)) := by
+/-- **HCF subsumes GS**: on every SMP instance HCF succeeds and its output
+    is core-stable — GS's guarantee, held by HCF's own output. -/
+theorem hcf_subsumes_gs [LinearOrder α] (prof : PreferenceProfile α)
+    (h : IsSMP prof) :
+    ∃ g : Grouping α, hcfGrouping prof = some g ∧ CoreStable prof g := by
   sorry
 
 end HedonicGrouping.Correctness.HCF_subsumes_GS

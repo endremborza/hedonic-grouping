@@ -1,36 +1,39 @@
 import Mathlib
 import HedonicGrouping.Core
 import HedonicGrouping.Problems.RMP
-import HedonicGrouping.Algorithms.Irving
+import HedonicGrouping.Problems.HCP
 import HedonicGrouping.Algorithms.HCF
 
 namespace HedonicGrouping.Correctness.HCF_subsumes_IRV
 /-!
 # HCF subsumes Irving on RMP
 
-Sharper than `hcf_solves_rmp`: on a size-2 instance, HCF either produces
-the same matching as Irving (when Irving succeeds) or also fails (when
-Irving certifies no stable matching exists). Not needed for the
-existence-level unification (see `HCF_HCP.lean`).
+Guarantee subsumption (D1): on the embedded RMP instance, HCF's own named
+output carries the guarantee `irving_decides_rmp` establishes for Irving —
+it decides solvability. Either HCF returns a core-stable grouping, or it
+returns `none` and no genuine pair matching is core-stable. Negative
+conclusions quantify over `IsPairMatching` (bare `CoreStable` is vacuously
+satisfiable under size-2 profiles).
 
-Two statements because Irving is a decision procedure that can fail
-"correctly" (no stable matching exists); HCF on the same instance must
-agree on the outcome.
+Step-by-step trajectory equivalence with Irving's run is a strictly
+stronger, unscheduled claim — future work, revisited only if a reviewer
+asks.
 -/
 
 open HedonicGrouping.Core
 open HedonicGrouping.Problems.RMP
-open HedonicGrouping.Algorithms.Irving
+open HedonicGrouping.Problems.HCP
 open HedonicGrouping.Algorithms.HCF
 
 variable {α : Type*} [DecidableEq α] [Fintype α]
 
-/-- **HCF and Irving agree on whether a stable matching exists.** -/
-theorem hcf_irving_agree_on_solvability
-    (prof : PreferenceProfile α)
-    (_hvalid : IsValidProfile prof) (_hsize : SizeTwo prof) :
-    (∃ μ : Grouping α, PairwiseStable prof μ) ↔
-      PairwiseStable prof (hcfGrouping prof) := by
+/-- **HCF subsumes Irving**: HCF decides RMP solvability — a core-stable
+    output, or `none` with no core-stable genuine pair matching. -/
+theorem hcf_subsumes_irv [LinearOrder α] (prof : PreferenceProfile α)
+    (h : IsRMP prof) :
+    (∃ g : Grouping α, hcfGrouping prof = some g ∧ CoreStable prof g) ∨
+    (hcfGrouping prof = none ∧
+      ∀ μ : Grouping α, IsPairMatching prof μ → ¬ CoreStable prof μ) := by
   sorry
 
 end HedonicGrouping.Correctness.HCF_subsumes_IRV

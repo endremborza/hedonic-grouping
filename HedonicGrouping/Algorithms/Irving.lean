@@ -177,13 +177,11 @@ def RemovedDominated (reduced : α → List α) (prof : PreferenceProfile α) : 
 /-! ## Rotation machinery -/
 
 /-- A rotation cycle: proposer-partner pairs forming a nonempty cycle.
-    The field stays `length_pos` (length ≥ 1) by design: rather than
-    strengthen it, length-≥-2 is derived on demand from duality via
-    `rotationCycle_length_ge_2_of_dual` (a length-1 cycle's sole edge is a
-    self-loop, which `isRotation_no_selfLoop` forbids under `Phase1Duality`).
-    `Phase1Duality` is now threaded through Phase 2, so `hdual` is in scope
-    wherever the ≥-2 fact is needed; the earlier "self-loops are genuine"
-    reading was an artifact of the superseded buggy `_cascade` model. -/
+    The field stays `length_pos` (length ≥ 1) by design: on a dual table a
+    length-1 cycle's sole edge would be a self-loop, which
+    `isRotation_no_selfLoop` forbids under `Phase1Duality`, so the weaker
+    field loses nothing; the earlier "self-loops are genuine" reading was
+    an artifact of the superseded buggy `_cascade` model. -/
 structure RotationCycle (α : Type*) where
   pairs      : List (α × α)
   length_pos : 0 < pairs.length
@@ -372,22 +370,6 @@ lemma rotationShift_off (c : RotationCycle α) (μ : Grouping α) (a : α)
   simp [rotationShift, h]
 
 omit [Fintype α] in
-/-- The shifted matching keeps every agent inside its own coalition whenever `μ`
-    does: on a cycle agent `rotationShift c μ a = {a, b}` contains `a` by
-    construction, off-cycle it is `μ a` which contains `a` by `hμ`. The
-    `IsValidGrouping` half of the upper-matching witness of `solvableInTable_step`
-    — consumed by its `IsPairMatching` / `coalition_eq_pairPartner` reasoning
-    (which reads `a ∈ rotationShift c μ a`), and unconditional in the cycle-agent
-    distinctness still open for the rest of that branch. -/
-lemma rotationShift_isValidGrouping (c : RotationCycle α) (μ : Grouping α)
-    (hμ : IsValidGrouping μ) : IsValidGrouping (rotationShift c μ) := by
-  intro a
-  unfold rotationShift
-  split
-  · simp
-  · exact hμ a
-
-omit [Fintype α] in
 /-- On a cycle agent, the shifted coalition's `pairPartner` is the head shift
     partner. `rotationShift c μ a = {a, b}` for the head shift partner `b`, so
     when `a ≠ b` its `pairPartner` is `b` (`pairPartner_eq_of_card_two`). The
@@ -571,35 +553,6 @@ theorem rotation_eliminates_less_preferred_of_dual
       {(c.pairs.get i).2, (c.pairs.get (nextFin i c.length_pos)).1} :=
   rotation_eliminates_less_preferred c reduced prof hrot hcompat hsym i
     (isRotation_no_selfLoop c reduced prof hvalid hcompat hdual hrot i)
-
-omit [Fintype α] in
-/-- **Rotations on a dual table have length ≥ 2.** A length-1 cycle's sole
-    edge is a self-loop: `nextFin ⟨0,_⟩ = ⟨0,_⟩`, so its rotation edge has
-    `p_0 = p_next`, which `isRotation_no_selfLoop` forbids under
-    `Phase1Duality`. This derives `2 ≤ length` from duality on demand, so the
-    `RotationCycle.length_pos` field need not be strengthened to `length_ge_2`,
-    and supplies the period-≥-2 fact `findRotation`'s cycle construction carries. -/
-theorem rotationCycle_length_ge_2_of_dual
-    (c : RotationCycle α)
-    (reduced : α → List α)
-    (prof : PreferenceProfile α)
-    (hvalid : IsValidProfile prof)
-    (hcompat : ReducedListCompatible reduced prof)
-    (hdual : Phase1Duality reduced)
-    (hrot : IsRotation c reduced) :
-    2 ≤ c.pairs.length := by
-  by_contra h
-  push_neg at h
-  have h1 : c.pairs.length = 1 := by have := c.length_pos; omega
-  have hself :=
-    isRotation_no_selfLoop c reduced prof hvalid hcompat hdual hrot ⟨0, c.length_pos⟩
-  apply hself
-  have e : nextFin (⟨0, c.length_pos⟩ : Fin c.pairs.length) c.length_pos
-      = ⟨0, c.length_pos⟩ := by
-    apply Fin.ext
-    show ((0 : ℕ) + 1) % c.pairs.length = 0
-    rw [h1, Nat.mod_one]
-  rw [e]
 
 omit [Fintype α] in
 /-- **The rotation-shift coalition is ranked.** For a cycle agent `a` whose head
@@ -2745,6 +2698,174 @@ theorem rotationShift_hclosed
         exact ⟨j, List.mem_finRange _, if_pos haeq⟩
       rw [ha_nil] at hmem_shift; simp at hmem_shift
 
+omit [Fintype α] in
+/-- **No blocking pair of the rotation-shift witness anchors on a side that fails
+    to block `μ`** — the asymmetric core of the witness's `PairwiseStable` half.
+    Suppose `{a, b}` blocks `rotationShift c μ` while `a`'s side does *not* block
+    the upper matching `μ` (`hfail`). Every case refutes:
+    * `a` off-cycle — its shift coalition *is* `μ a`, so `hA` contradicts `hfail`;
+    * `a = q_i` — the shift strictly improved `a`
+      (`rotation_eliminates_less_preferred_of_dual` + `hall i`), so `hA`
+      transports across the improvement into a `μ`-block, contradicting `hfail`;
+    * `a = p_i` — the worsened side. If `b` is still on `reduced p_i`: index 0 is
+      the head `q_{i-1}` (`isRotation_pred_head`; that case dies on `b`'s side —
+      `q_{i-1}` strictly prefers its own shift partner `p_{i-1}` to `p_i`,
+      refuting `hB`), index 1 is the shift partner `q_i` itself (refuting `hA`
+      reflexively), and deeper entries are outranked by `q_i` (compatibility,
+      refuting `hA` transitively). If `b` is off the list, the pair is mutual
+      (both `Ranks.fst_mem`s) and deleted, so `RemovedDominated` justifies the
+      deletion on one side: the `p_i`-side disjunct ranks the kept `q_i` above
+      `b` (refuting `hA`); the `b`-side disjunct ranks `b`'s kept shift partner
+      (`rotationShift_stablePairInvariant`) above `p_i` (refuting `hB`). -/
+private lemma rotationShift_block_side_false
+    (c : RotationCycle α) (reduced : α → List α) (prof : PreferenceProfile α)
+    (hsize : SizeTwo prof) (hvalid : IsValidProfile prof)
+    (hcompat : ReducedListCompatible reduced prof)
+    (hsym : ReducedTableSymmetric reduced)
+    (hnodup : ReducedTableNodup reduced)
+    (hdual : Phase1Duality reduced)
+    (hrot : IsRotation c reduced)
+    (hprop : ProposersDistinct c)
+    (hrd : RemovedDominated reduced prof)
+    (μ : Grouping α) (hmatch : IsPairMatching prof μ)
+    (hinv : StablePairInvariant reduced prof μ)
+    (hall : ∀ i : Fin c.pairs.length, μ (c.pairs.get i).2 =
+      {(c.pairs.get i).2, (c.pairs.get (nextFin i c.length_pos)).1})
+    {a b : α}
+    (hA : Ranks prof a {a, b} (rotationShift c μ a))
+    (hB : Ranks prof b {a, b} (rotationShift c μ b))
+    (hfail : ¬ Ranks prof a {a, b} (μ a)) : False := by
+  cases hh : (rotationShiftPartner c a).head? with
+  | none =>
+    have hoff : rotationShift c μ a = μ a := by simp [rotationShift, hh]
+    rw [hoff] at hA
+    exact hfail hA
+  | some d =>
+    have hcoal_a : rotationShift c μ a = {a, d} := by simp [rotationShift, hh]
+    rw [hcoal_a] at hA
+    have hd_mem : d ∈ rotationShiftPartner c a :=
+      List.mem_of_mem_head? (Option.mem_def.mpr hh)
+    obtain ⟨i, hcase⟩ := mem_rotationShiftPartner hd_mem
+    rcases hcase with ⟨ha_q, hd_p⟩ | ⟨ha_p, hd_q⟩
+    · -- `a = q_i`: the shift improved `a`, so the block transports to `μ`.
+      subst ha_q; subst hd_p
+      apply hfail
+      rw [hall i]
+      exact Ranks.trans hvalid hA
+        (rotation_eliminates_less_preferred_of_dual c reduced prof hvalid hrot hcompat
+          hsym hdual i)
+    · -- `a = p_i`: the worsened side.
+      subst ha_p; subst hd_q
+      obtain ⟨j, hjnext, hhead⟩ := isRotation_pred_head c reduced hdual hrot i
+      obtain ⟨hsec, _, _⟩ := hrot i
+      obtain ⟨h1, hq1⟩ := List.getElem?_eq_some_iff.mp hsec
+      by_cases hbq : b = (c.pairs.get j).2
+      · -- `b = q_{i-1}`: `b` strictly prefers its own shift partner `p_{i-1}` to `p_i`.
+        subst hbq
+        have hpj_mem : (c.pairs.get j).1 ∈ rotationShiftPartner c (c.pairs.get j).2 := by
+          simp only [rotationShiftPartner, List.mem_filterMap]
+          exact ⟨j, List.mem_finRange _, if_pos rfl⟩
+        cases hqh : (rotationShiftPartner c (c.pairs.get j).2).head? with
+        | none =>
+          cases hl : rotationShiftPartner c (c.pairs.get j).2 with
+          | nil => rw [hl] at hpj_mem; simp at hpj_mem
+          | cons _ _ => rw [hl] at hqh; simp at hqh
+        | some e =>
+          have he_mem : e ∈ rotationShiftPartner c (c.pairs.get j).2 :=
+            List.mem_of_mem_head? (Option.mem_def.mpr hqh)
+          have hdisj := rotation_proposer_partner_disjoint_of_upper c reduced prof hsize
+            hnodup hdual hrot μ hmatch hall
+          have hepj : e = (c.pairs.get j).1 :=
+            rotationShiftPartner_subsingleton c reduced hdual hrot hprop hdisj
+              he_mem hpj_mem
+          rw [hepj] at hqh
+          have hcoal_qj : rotationShift c μ (c.pairs.get j).2 =
+              {(c.pairs.get j).2, (c.pairs.get j).1} := by
+            simp only [rotationShift, hqh]
+          rw [hcoal_qj, Finset.pair_comm (c.pairs.get i).1 (c.pairs.get j).2] at hB
+          have himpj := rotation_eliminates_less_preferred_of_dual c reduced prof hvalid
+            hrot hcompat hsym hdual j
+          rw [hjnext] at himpj
+          exact Ranks.irrefl hvalid (Ranks.trans hvalid hB himpj)
+      · by_cases hbmem : b ∈ reduced (c.pairs.get i).1
+        · -- `b` still on `p_i`'s list: index 0 is excluded, deeper is outranked.
+          obtain ⟨n, hn, hbn⟩ := List.mem_iff_getElem.mp hbmem
+          by_cases hn0 : n = 0
+          · subst hn0
+            apply hbq
+            rw [List.head?_eq_getElem?] at hhead
+            obtain ⟨h0, hq0⟩ := List.getElem?_eq_some_iff.mp hhead
+            exact hbn.symm.trans hq0
+          by_cases hn1 : n = 1
+          · subst hn1
+            have hb_eq : b = (c.pairs.get i).2 := hbn.symm.trans hq1
+            rw [hb_eq] at hA
+            exact Ranks.irrefl hvalid hA
+          · have hlt : (⟨1, h1⟩ : Fin (reduced (c.pairs.get i).1).length) < ⟨n, hn⟩ :=
+              Fin.mk_lt_mk.mpr (by omega)
+            have hrank := hcompat (c.pairs.get i).1 ⟨1, h1⟩ ⟨n, hn⟩ hlt
+            rw [show (reduced (c.pairs.get i).1)[(⟨1, h1⟩ :
+                  Fin (reduced (c.pairs.get i).1).length)] = (c.pairs.get i).2 from hq1,
+              show (reduced (c.pairs.get i).1)[(⟨n, hn⟩ :
+                  Fin (reduced (c.pairs.get i).1).length)] = b from hbn] at hrank
+            exact Ranks.irrefl hvalid (Ranks.trans hvalid hA hrank)
+        · -- `{p_i, b}` was deleted: `RemovedDominated` kills on the rejecting side.
+          have hab_a : ({(c.pairs.get i).1, b} : Finset α) ∈ prof (c.pairs.get i).1 :=
+            hA.fst_mem
+          have hab_b : ({(c.pairs.get i).1, b} : Finset α) ∈ prof b := hB.fst_mem
+          rcases hrd (c.pairs.get i).1 b hab_a hab_b hbmem with hleft | hright
+          · have hqi_mem : (c.pairs.get i).2 ∈ reduced (c.pairs.get i).1 :=
+              List.mem_of_getElem? hsec
+            exact Ranks.irrefl hvalid (Ranks.trans hvalid hA (hleft _ hqi_mem))
+          · have hsinv := rotationShift_stablePairInvariant c reduced prof hsize hcompat
+              hsym hrot μ hinv b
+            have hνb_prof := rotationShift_mem_prof c reduced prof hvalid hcompat hsym
+              hdual hrot μ hmatch b
+            have hb_in : b ∈ rotationShift c μ b := (hvalid b).2 _ hνb_prof
+            have hνb_eq : rotationShift c μ b =
+                {b, pairPartner b (rotationShift c μ b)} :=
+              coalition_eq_pairPartner hb_in (hsize b _ hνb_prof)
+            have hd_rank := hright _ hsinv
+            rw [← hνb_eq, Finset.pair_comm b (c.pairs.get i).1] at hd_rank
+            exact Ranks.irrefl hvalid (Ranks.trans hvalid hB hd_rank)
+
+omit [Fintype α] in
+/-- **The rotation-shift witness is pairwise stable** — the `PairwiseStable` half
+    of the upper-matching witness of `solvableInTable_step`, its last
+    non-mechanical obligation. A blocking pair of `rotationShift c μ` cannot also
+    block the stable upper matching `μ`, so on at least one side the `μ`-block
+    fails; `rotationShift_block_side_false` refutes from exactly that side (its
+    hypotheses are symmetric in the pair — `Finset.pair_comm` swaps the roles). -/
+theorem rotationShift_pairwiseStable
+    (c : RotationCycle α) (reduced : α → List α) (prof : PreferenceProfile α)
+    (hsize : SizeTwo prof) (hvalid : IsValidProfile prof)
+    (hcompat : ReducedListCompatible reduced prof)
+    (hsym : ReducedTableSymmetric reduced)
+    (hnodup : ReducedTableNodup reduced)
+    (hdual : Phase1Duality reduced)
+    (hrot : IsRotation c reduced)
+    (hprop : ProposersDistinct c)
+    (hrd : RemovedDominated reduced prof)
+    (μ : Grouping α) (hmatch : IsPairMatching prof μ)
+    (hstable : PairwiseStable prof μ)
+    (hinv : StablePairInvariant reduced prof μ)
+    (hall : ∀ i : Fin c.pairs.length, μ (c.pairs.get i).2 =
+      {(c.pairs.get i).2, (c.pairs.get (nextFin i c.length_pos)).1}) :
+    PairwiseStable prof (rotationShift c μ) := by
+  rintro a b ⟨hne, hA, hB⟩
+  by_cases hRA : Ranks prof a {a, b} (μ a)
+  · have hRB : ¬ Ranks prof b {a, b} (μ b) := fun h => hstable a b ⟨hne, hRA, h⟩
+    have hBA : Ranks prof b {b, a} (rotationShift c μ b) := by
+      rw [Finset.pair_comm b a]; exact hB
+    have hAB : Ranks prof a {b, a} (rotationShift c μ a) := by
+      rw [Finset.pair_comm b a]; exact hA
+    have hRB' : ¬ Ranks prof b {b, a} (μ b) := by
+      rw [Finset.pair_comm b a]; exact hRB
+    exact rotationShift_block_side_false c reduced prof hsize hvalid hcompat hsym hnodup
+      hdual hrot hprop hrd μ hmatch hinv hall hBA hAB hRB'
+  · exact rotationShift_block_side_false c reduced prof hsize hvalid hcompat hsym hnodup
+      hdual hrot hprop hrd μ hmatch hinv hall hA hB hRA
+
 /-- **Existential solvability is preserved by a Phase-2 step** — the corrected
     Phase-2 crux, replacing the false universal-survival
     `eliminateRotation_preserves_stablePair` (removed 2026-06-23). If the table
@@ -2763,17 +2884,24 @@ theorem rotationShift_hclosed
     `μ` already avoids every removed pair and is itself the witness. Both branches
     yield a pairwise-stable matching surviving `reduceTable (eliminateRotation …)`
     — probe-validated 6278/6278 Phase-2 steps over exhaustive n=4 + random
-    n=6/8/10. The avoid branch is discharged; the upper-matching witness is the
-    single remaining `sorry`. See `.cril/ideas.md`. -/
+    n=6/8/10. Both branches are discharged: the avoid branch by
+    `stablePair_eliminate_of_avoids`, the upper branch by the `rotationShift`
+    witness — all-or-nothing (`musesRemovedPair_all_of_exists`) discharges the
+    structural hypotheses (`hdisj`/`hpin`/`hclosed`/cycle-avoid), and the witness's
+    four halves (`rotationShift_isPairMatching`, `rotationShift_pairwiseStable`,
+    `rotationShift_avoids_removed`, `rotationShift_stablePairInvariant`) feed the
+    same two closers. -/
 theorem solvableInTable_step
     (reduced : α → List α) (prof : PreferenceProfile α) (c : RotationCycle α)
     (hsize : SizeTwo prof)
     (hrot : IsRotation c reduced)
+    (hprop : ProposersDistinct c)
     (hcompat : ReducedListCompatible reduced prof)
     (hsym : ReducedTableSymmetric reduced)
     (hnodup : ReducedTableNodup reduced)
     (hvalid : IsValidProfile prof)
     (hdual : Phase1Duality reduced)
+    (hrd : RemovedDominated reduced prof)
     (hsolv : SolvableInTable reduced prof) :
     SolvableInTable (reduceTable (eliminateRotation reduced c)) prof := by
   obtain ⟨μ, hmatch, hstable, hinv⟩ := hsolv
@@ -2785,23 +2913,44 @@ theorem solvableInTable_step
     exact solvableInTable_of_eliminate_survivor reduced prof c hsize hrot hcompat hsym
       hnodup hvalid μ hmatch hstable
       (stablePair_eliminate_of_avoids reduced prof c μ hinv hall)
-  · -- **Upper-matching branch (open).** `μ` uses *some* removed pair; rotations being
+  · -- **Upper-matching branch.** `μ` uses *some* removed pair; rotations being
     -- all-or-nothing in a stable matching (`hdual` + `hcompat`) it then uses *every*
     -- removed pair `{q_i, p_{i+1}}` (μ q_i = p_{i+1} ∀i). Witness (probe-validated
     -- 2026-06-23; the old q_i↦p_{i+1} reading is FALSE): `μ` rotation-shifted by
-    -- q_i ↦ p_i along the cycle (off-cycle agents unchanged). Show it is
-    -- IsPairMatching + PairwiseStable and avoids every removed pair, then it feeds
+    -- q_i ↦ p_i along the cycle (off-cycle agents unchanged). It is
+    -- IsPairMatching + PairwiseStable and avoids every removed pair, so it feeds
     -- `stablePair_eliminate_of_avoids` + `solvableInTable_of_eliminate_survivor`
     -- exactly as the avoid branch above does.
     push_neg at hall
     -- All-or-nothing now in hand: `μ` is the upper matching, using every removed pair.
     -- This is the load-bearing fact the shift witness's `hpin`/`hclosed`/cycle-avoid
-    -- hypotheses are discharged from (next units).
+    -- hypotheses are discharged from.
     have hall_pairs : ∀ i : Fin c.pairs.length, μ (c.pairs.get i).2 =
         {(c.pairs.get i).2, (c.pairs.get (nextFin i c.length_pos)).1} :=
       musesRemovedPair_all_of_exists c reduced prof hsize hvalid hcompat hsym hdual hrot
         μ hmatch hstable hinv hall
-    sorry
+    have hdisj : ∀ i j : Fin c.pairs.length, (c.pairs.get i).1 ≠ (c.pairs.get j).2 :=
+      rotation_proposer_partner_disjoint_of_upper c reduced prof hsize hnodup hdual hrot
+        μ hmatch hall_pairs
+    have hpin : ∀ a b : α, (rotationShiftPartner c a).head? = some b →
+        (rotationShiftPartner c b).head? = some a :=
+      fun _ _ hh => rotationShift_hpin c reduced hdual hrot hprop hdisj hh
+    have hclosed : ∀ a : α, (rotationShiftPartner c a).head? = none →
+        (rotationShiftPartner c (pairPartner a (μ a))).head? = none :=
+      rotationShift_hclosed c reduced prof hsize hvalid hcompat hrot μ hmatch hall_pairs
+    have hcycle_avoid : ∀ a b : α, (rotationShiftPartner c a).head? = some b →
+        b ∉ rotationRemovals c a :=
+      fun _ _ hh => rotationShift_cycle_avoid c reduced prof hvalid hcompat hdual hrot
+        hprop hdisj (List.mem_of_mem_head? (Option.mem_def.mpr hh))
+    exact solvableInTable_of_eliminate_survivor reduced prof c hsize hrot hcompat hsym
+      hnodup hvalid (rotationShift c μ)
+      (rotationShift_isPairMatching c reduced prof hvalid hsize hcompat hsym hdual hrot
+        μ hmatch hpin hclosed)
+      (rotationShift_pairwiseStable c reduced prof hsize hvalid hcompat hsym hnodup hdual
+        hrot hprop hrd μ hmatch hstable hinv hall_pairs)
+      (stablePair_eliminate_of_avoids reduced prof c (rotationShift c μ)
+        (rotationShift_stablePairInvariant c reduced prof hsize hcompat hsym hrot μ hinv)
+        (rotationShift_avoids_removed c reduced prof hsize hcompat hrot μ hcycle_avoid))
 
 /-- The reduce pass establishes the five structural reduced-table invariants
     from a symmetric, duplicate-free, compatible starting table: it carries
@@ -3213,9 +3362,9 @@ theorem phase1_produces_reduced_table
     (`phase1Duality_reduceTable`), and does not increase length
     (`reduceTable_totalLength_le`). This is the per-step invariant bundle the
     existential-solvability `phase2` consumes at each rotation step; with
-    `Phase1Duality` in scope, `rotationCycle_length_ge_2_of_dual` and
-    `rotation_eliminates_less_preferred_of_dual` are available on demand (the
-    `RotationCycle.length_pos` field need not be strengthened). Phase 2's
+    `Phase1Duality` in scope, `rotation_eliminates_less_preferred_of_dual` is
+    available on demand (the `RotationCycle.length_pos` field need not be
+    strengthened). Phase 2's
     solvability thread is the separate existential `SolvableInTable`, carried by
     `solvableInTable_step` — not part of this invariant bundle. -/
 theorem phase2_reduceTable_step_preserves_invariants
@@ -3289,41 +3438,20 @@ noncomputable def phase2
         have hpos : 0 < (reduced a).length :=
           List.length_pos_of_ne_nil (hempty a)
         omega
-      obtain ⟨c, hrot, _⟩ := findRotation reduced hsym hcasc a ha
+      obtain ⟨c, hrot, hprop⟩ := findRotation reduced hsym hcasc a ha
       obtain ⟨hsym', hcompat', hcasc', hdual', hnodup', hrd', hlt⟩ :=
         phase2_reduceTable_step_preserves_invariants reduced prof c hsize hrot hcompat hsym hnodup hrd
       rcases phase2 (reduceTable (eliminateRotation reduced c)) prof hsize hvalid
           hcompat' hsym' hcasc' hnodup' hdual' hrd' with
         hpos | hneg
       · exact Or.inl hpos
-      · exact Or.inr (mt (solvableInTable_step reduced prof c hsize hrot hcompat hsym
-          hnodup hvalid hdual) hneg)
+      · exact Or.inr (mt (solvableInTable_step reduced prof c hsize hrot hprop hcompat
+          hsym hnodup hvalid hdual hrd) hneg)
 termination_by totalLength reduced
 decreasing_by
   exact hlt
 
 /-! ## Endpoint theorems -/
-
-omit [DecidableEq α] [Fintype α] in
-/-- In an all-singleton symmetric reduced table the partner relation is
-    mutual: if `a`'s sole remaining partner is `b`, then `b`'s sole
-    remaining partner is `a`. This is the well-formedness fact that lets
-    `reducedTable_singleton_stable` read `singletonMatching` as a genuine
-    (symmetric) matching — the analogue of `Core.pairPartner_mem`/`_ne`
-    for the singleton-table representation. -/
-private lemma singleton_partner_mutual
-    (reduced : α → List α)
-    (hsym : ReducedTableSymmetric reduced)
-    (hsingleton : AllSingleton reduced)
-    {a b : α} (hb : (reduced a).head? = some b) :
-    (reduced b).head? = some a := by
-  obtain ⟨x, hx⟩ := List.length_eq_one_iff.mp (hsingleton a)
-  obtain ⟨y, hy⟩ := List.length_eq_one_iff.mp (hsingleton b)
-  rw [hx, List.head?_cons, Option.some.injEq] at hb
-  have hbmem : b ∈ reduced a := by rw [hx, ← hb]; simp
-  have hamem : a ∈ reduced b := (hsym a b).mp hbmem
-  rw [hy, List.mem_singleton] at hamem
-  rw [hy, List.head?_cons, hamem]
 
 omit [Fintype α] in
 /-- The substantive half of `reducedTable_singleton_stable`: given the
