@@ -45,7 +45,7 @@ EXTRACT_DIR ?= $(LEAN_DIR)/extracted
 
 .PHONY: all check check-one disprove disprove-one \
         sorry2lemma repair simplify simplify-one \
-        extract help lean-version python-check
+        extract help lean-version python-check build run-lean diff
 
 # ── check ─────────────────────────────────────────────────────────────────────
 
@@ -53,6 +53,21 @@ all: check
 
 python-check:
 	.venv/bin/pytest
+
+# ── executable ──────────────────────────────────────────────────────────────
+# Exec.lean / Main.lean are executable-only (use Lean.Json + IO); built
+# locally via lake, not AXLE-checked, so they are absent from LEAF_FILES.
+
+build:
+	lake build hedonic-grouping
+
+# Pipe a JSON instance on stdin: make run-lean < instance.json
+run-lean: build
+	@.lake/build/bin/hedonic-grouping
+
+# Differential check: Lean executable output vs the Python oracle.
+diff: build
+	LEAN_PARITY_EXHAUSTIVE=1 .venv/bin/pytest src/tests/test_lean_parity.py
 
 check:
 	@set -e; for f in $(LEAF_FILES); do \
